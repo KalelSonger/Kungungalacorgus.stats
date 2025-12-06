@@ -14,36 +14,22 @@ app.secret_key = '84g299n6-179k-4228-m245-0r1629562837'
 CLIENT_ID = os.getenv('CLIENT_ID', '2a061e08a3f94fd68b36a41fc9922a3b')
 CLIENT_SECRET = os.getenv('CLIENT_SECRET', '599323f77f88464fbe768772e4d4c716')
 
-# Set up ngrok tunnel for HTTPS redirect URI
-def setup_ngrok_tunnel():
+# Static ngrok domain for consistent redirect URI
+NGROK_DOMAIN = 'easily-crankier-coleman.ngrok-free.dev'
+REDIRECT_URI = os.getenv('REDIRECT_URI', f'https://{NGROK_DOMAIN}/callback')
+
+# Start ngrok tunnel automatically
+def start_ngrok():
     ngrok_path = os.path.expanduser('~\\AppData\\Local\\Microsoft\\WindowsApps\\ngrok.exe')
     try:
-        # Start ngrok tunnel on port 5000
-        subprocess.Popen([ngrok_path, 'http', '5000', '--log', 'stdout'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        time.sleep(3)  # Give ngrok time to start and connect
-        
-        # Get ngrok public URL from the API
-        try:
-            response = requests.get('http://localhost:4040/api/tunnels', timeout=5)
-            tunnels = response.json()
-            if tunnels.get('tunnels'):
-                public_url = tunnels['tunnels'][0]['public_url']
-                return f"{public_url}/callback"
-        except Exception as e:
-            print(f"Could not retrieve ngrok tunnel URL: {e}")
+        subprocess.Popen([ngrok_path, 'http', '5000', f'--domain={NGROK_DOMAIN}'], 
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        time.sleep(2)  # Give ngrok time to start
+        print("✓ ngrok tunnel started successfully")
     except Exception as e:
-        print(f"Error starting ngrok: {e}")
-    return None
+        print(f"Warning: Could not start ngrok: {e}")
 
-ngrok_redirect = setup_ngrok_tunnel()
-REDIRECT_URI = os.getenv('REDIRECT_URI', ngrok_redirect or 'http://localhost:5000/callback')
-
-if ngrok_redirect:
-    print(f"\n{'='*70}")
-    print(f"NGROK TUNNEL ACTIVE!")
-    print(f"Register this redirect URI in Spotify Developer Dashboard:")
-    print(f"  {REDIRECT_URI}")
-    print(f"{'='*70}\n")
+start_ngrok()
 
 AUTH_URL = 'https://accounts.spotify.com/authorize'
 TOKEN_URL = 'https://accounts.spotify.com/api/token'
@@ -74,8 +60,17 @@ def login():
 
 @app.route('/callback')
 def callback():
+    print(f"DEBUG: Callback called")
+    print(f"DEBUG: Request URL: {request.url}")
+    print(f"DEBUG: Request base_url: {request.base_url}")
+    print(f"DEBUG: REDIRECT_URI in code: {REDIRECT_URI}")
+    print(f"DEBUG: Args: {request.args}")
+    
     if 'error' in request.args:
-        return jsonify({'error': request.args['error']})
+        error_msg = request.args.get('error', 'Unknown error')
+        error_desc = request.args.get('error_description', 'No description')
+        print(f"DEBUG: Error from Spotify: {error_msg} - {error_desc}")
+        return jsonify({'error': error_msg, 'description': error_desc})
     
     if 'code' in request.args:
         req_body = {
@@ -86,7 +81,10 @@ def callback():
             'client_secret': CLIENT_SECRET,
         }
         
+        print(f"DEBUG: Requesting token with redirect_uri: {REDIRECT_URI}")
         response = requests.post(TOKEN_URL, data=req_body)
+        print(f"DEBUG: Token response status: {response.status_code}")
+        print(f"DEBUG: Token response: {response.text}")
         token_info = response.json()
         
         session['access_token'] = token_info['access_token']
@@ -102,84 +100,15 @@ def menu():
     
     html = """
     <h1>Spotify Stats Menu</h1>
-    <h2>Top 5</h2>
     <ul>
-        <li><a href='/top_tracks'>Top 5 Tracks</a></li>
-        <li><a href='/top_artists'>Top 5 Artists</a></li>
-        <li><a href='/top_albums'>Top 5 Albums</a></li>
-    </ul>
-    <h2>Most Recent 5</h2>
-    <ul>
-        <li><a href='/recent_tracks'>Recent 5 Tracks</a></li>
-        <li><a href='/recent_artists'>Recent 5 Artists</a></li>
-        <li><a href='/recent_albums'>Recent 5 Albums</a></li>
-    </ul>
-    <h2>Other</h2>
-    <ul>
-        <li><a href='/playlists'>All Playlists</a></li>
+        <li><a href='/recent_50_songs'>50 Recent</a></li>
     </ul>
     <a href='/'>Back to home</a>
     """
     return html
 
-@app.route('/top_tracks')
-def get_top_tracks():
-    if 'access_token' not in session:
-        return redirect('/login')
-    
-    if datetime.now().timestamp() > session['expires_at']:
-        return redirect('/refresh_token')
-    
-    headers = {
-        'Authorization': f"Bearer {session['access_token']}"
-    }
-    
-    response = requests.get(API_BASE_URL + '/me/top/tracks?limit=5', headers=headers)
-    top_tracks = response.json()
-    
-    track_titles = []
-    if 'items' in top_tracks:
-        for item in top_tracks['items']:
-            if 'name' in item:
-                track_titles.append(item['name'])
-    
-    html = "<h1>Your Top 5 Tracks</h1><ol>"
-    for title in track_titles:
-        html += f"<li>{title}</li>"
-    html += "</ol><a href='/menu'>Back to menu</a>"
-    
-    return html
-
-@app.route('/top_artists')
-def get_top_artists():
-    if 'access_token' not in session:
-        return redirect('/login')
-    
-    if datetime.now().timestamp() > session['expires_at']:
-        return redirect('/refresh_token')
-    
-    headers = {
-        'Authorization': f"Bearer {session['access_token']}"
-    }
-    
-    response = requests.get(API_BASE_URL + '/me/top/artists?limit=5', headers=headers)
-    top_artists = response.json()
-    
-    artist_names = []
-    if 'items' in top_artists:
-        for item in top_artists['items']:
-            if 'name' in item:
-                artist_names.append(item['name'])
-    
-    html = "<h1>Your Top 5 Artists</h1><ol>"
-    for name in artist_names:
-        html += f"<li>{name}</li>"
-    html += "</ol><a href='/menu'>Back to menu</a>"
-    
-    return html
-
-@app.route('/top_albums')
-def get_top_albums():
+@app.route('/recent_50_songs')
+def recent_50_songs():
     if 'access_token' not in session:
         return redirect('/login')
     
@@ -193,151 +122,55 @@ def get_top_albums():
     response = requests.get(API_BASE_URL + '/me/player/recently-played?limit=50', headers=headers)
     recently_played = response.json()
     
-    # Extract unique album names from recently played (top albums derived from recent tracks)
-    albums_seen = set()
-    album_names = []
+    songs = []
     if 'items' in recently_played:
         for item in recently_played['items']:
-            if 'track' in item and 'album' in item['track']:
-                album = item['track']['album']['name']
-                if album not in albums_seen:
-                    albums_seen.add(album)
-                    album_names.append(album)
-                    if len(album_names) >= 5:
-                        break
+            if 'track' in item:
+                track = item['track']
+                song_name = track.get('name', 'Unknown')
+                artists = ', '.join([artist['name'] for artist in track.get('artists', []) if 'name' in artist])
+                album = track.get('album', {}).get('name', 'Unknown')
+                duration_ms = track.get('duration_ms', 0)
+                duration_min = duration_ms // 60000
+                duration_sec = (duration_ms % 60000) // 1000
+                duration = f"{duration_min}:{duration_sec:02d}"
+                
+                songs.append({
+                    'name': song_name,
+                    'artists': artists,
+                    'album': album,
+                    'duration': duration
+                })
     
-    html = "<h1>Your Top 5 Albums (from Recently Played)</h1><ol>"
-    for name in album_names:
-        html += f"<li>{name}</li>"
-    html += "</ol><a href='/menu'>Back to menu</a>"
+    # Save to txt file
     
-    return html
-
-@app.route('/recent_tracks')
-def get_recent_tracks():
-    if 'access_token' not in session:
-        return redirect('/login')
+    html = """
+    <h1>Your 50 Most Recently Listened Songs</h1>
+        <p><em>No data saved to file.</em></p>
+    <table border="1" style="border-collapse: collapse; width: 100%;">
+    <tr>
+        <th style="padding: 10px; text-align: left;">Song Name</th>
+        <th style="padding: 10px; text-align: left;">Artists</th>
+        <th style="padding: 10px; text-align: left;">Album</th>
+        <th style="padding: 10px; text-align: center;">Length</th>
+    </tr>
+    """
     
-    if datetime.now().timestamp() > session['expires_at']:
-        return redirect('/refresh_token')
+    for i, song in enumerate(songs, 1):
+        html += f"""
+        <tr>
+            <td style="padding: 10px;">{song['name']}</td>
+            <td style="padding: 10px;">{song['artists']}</td>
+            <td style="padding: 10px;">{song['album']}</td>
+            <td style="padding: 10px; text-align: center;">{song['duration']}</td>
+        </tr>
+        """
     
-    headers = {
-        'Authorization': f"Bearer {session['access_token']}"
-    }
-    
-    response = requests.get(API_BASE_URL + '/me/player/recently-played?limit=5', headers=headers)
-    recently_played = response.json()
-    
-    track_titles = []
-    if 'items' in recently_played:
-        for item in recently_played['items']:
-            if 'track' in item and 'name' in item['track']:
-                track_titles.append(item['track']['name'])
-    
-    html = "<h1>Your Most Recent 5 Tracks</h1><ol>"
-    for title in track_titles:
-        html += f"<li>{title}</li>"
-    html += "</ol><a href='/menu'>Back to menu</a>"
-    
-    return html
-
-@app.route('/recent_artists')
-def get_recent_artists():
-    if 'access_token' not in session:
-        return redirect('/login')
-    
-    if datetime.now().timestamp() > session['expires_at']:
-        return redirect('/refresh_token')
-    
-    headers = {
-        'Authorization': f"Bearer {session['access_token']}"
-    }
-    
-    response = requests.get(API_BASE_URL + '/me/player/recently-played?limit=50', headers=headers)
-    recently_played = response.json()
-    
-    tracks_seen = set()
-    artist_groups = []
-    if 'items' in recently_played:
-        for item in recently_played['items']:
-            if 'track' in item and 'id' in item['track']:
-                track_id = item['track']['id']
-                # Only process each track once
-                if track_id not in tracks_seen:
-                    tracks_seen.add(track_id)
-                    if 'artists' in item['track']:
-                        artists = [artist['name'] for artist in item['track']['artists'] if 'name' in artist]
-                        if artists:
-                            artist_groups.append(', '.join(artists))
-                            if len(artist_groups) >= 5:
-                                break
-    
-    html = "<h1>Your Most Recent 5 Artists</h1><ol>"
-    for artist_group in artist_groups:
-        html += f"<li>{artist_group}</li>"
-    html += "</ol><a href='/menu'>Back to menu</a>"
-    
-    return html
-
-@app.route('/recent_albums')
-def get_recent_albums():
-    if 'access_token' not in session:
-        return redirect('/login')
-    
-    if datetime.now().timestamp() > session['expires_at']:
-        return redirect('/refresh_token')
-    
-    headers = {
-        'Authorization': f"Bearer {session['access_token']}"
-    }
-    
-    response = requests.get(API_BASE_URL + '/me/player/recently-played?limit=50', headers=headers)
-    recently_played = response.json()
-    
-    albums_seen = set()
-    album_names = []
-    if 'items' in recently_played:
-        for item in recently_played['items']:
-            if 'track' in item and 'album' in item['track']:
-                album = item['track']['album']['name']
-                if album not in albums_seen:
-                    albums_seen.add(album)
-                    album_names.append(album)
-                    if len(album_names) >= 5:
-                        break
-    
-    html = "<h1>Your Most Recent 5 Albums</h1><ol>"
-    for name in album_names:
-        html += f"<li>{name}</li>"
-    html += "</ol><a href='/menu'>Back to menu</a>"
-    
-    return html
-
-@app.route('/playlists')
-def get_playlists():
-    if 'access_token' not in session:
-        return redirect('/login')
-    
-    if datetime.now().timestamp() > session['expires_at']:
-        return redirect('/refresh_token')
-    
-    headers = {
-        'Authorization': f"Bearer {session['access_token']}"
-    }
-    
-    response = requests.get(API_BASE_URL + '/me/playlists', headers=headers)
-    playlists_data = response.json()
-    
-    playlist_names = []
-    if 'items' in playlists_data:
-        for item in playlists_data['items']:
-            if 'name' in item:
-                playlist_names.append(item['name'])
-    
-    html = "<h1>Your Playlists</h1><ol>"
-    for name in playlist_names:
-        html += f"<li>{name}</li>"
-    html += "</ol><a href='/menu'>Back to menu</a>"
+    html += """
+    </table>
+    <br>
+    <a href='/menu'>Back to menu</a> | <a href='/'>Back to home</a>
+    """
     
     return html
 
