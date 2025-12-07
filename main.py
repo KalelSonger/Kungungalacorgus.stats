@@ -60,18 +60,11 @@ def login():
 
 @app.route('/callback')
 def callback():
-    print(f"DEBUG: Callback called")
-    print(f"DEBUG: Request URL: {request.url}")
-    print(f"DEBUG: Request base_url: {request.base_url}")
-    print(f"DEBUG: REDIRECT_URI in code: {REDIRECT_URI}")
-    print(f"DEBUG: Args: {request.args}")
-    
     if 'error' in request.args:
         error_msg = request.args.get('error', 'Unknown error')
         error_desc = request.args.get('error_description', 'No description')
-        print(f"DEBUG: Error from Spotify: {error_msg} - {error_desc}")
         return jsonify({'error': error_msg, 'description': error_desc})
-    
+
     if 'code' in request.args:
         req_body = {
             'code': request.args['code'],
@@ -80,17 +73,14 @@ def callback():
             'client_id': CLIENT_ID,
             'client_secret': CLIENT_SECRET,
         }
-        
-        print(f"DEBUG: Requesting token with redirect_uri: {REDIRECT_URI}")
+
         response = requests.post(TOKEN_URL, data=req_body)
-        print(f"DEBUG: Token response status: {response.status_code}")
-        print(f"DEBUG: Token response: {response.text}")
         token_info = response.json()
-        
+
         session['access_token'] = token_info['access_token']
-        session['refresh_token'] = token_info['refresh_token']
-        session['expires_at'] = datetime.now().timestamp() + token_info['expires_in']
-        
+        session['refresh_token'] = token_info.get('refresh_token', session.get('refresh_token'))
+        session['expires_at'] = datetime.now().timestamp() + token_info.get('expires_in', 3600)
+
         return redirect('/menu')
 
 @app.route('/menu')
