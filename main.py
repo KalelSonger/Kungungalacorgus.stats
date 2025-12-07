@@ -5,6 +5,8 @@ import json
 import subprocess
 import time
 import glob
+import platform
+import shutil
 
 from flask import Flask, redirect, request, session, jsonify
 from datetime import datetime, timedelta
@@ -21,7 +23,16 @@ REDIRECT_URI = os.getenv('REDIRECT_URI', f'https://{NGROK_DOMAIN}/callback')
 
 # Start ngrok tunnel automatically
 def start_ngrok():
-    ngrok_path = os.path.expanduser('~\\AppData\\Local\\Microsoft\\WindowsApps\\ngrok.exe')
+    # Detect OS and find ngrok executable
+    system = platform.system()
+    
+    if system == 'Windows':
+        ngrok_path = os.path.expanduser('~\\AppData\\Local\\Microsoft\\WindowsApps\\ngrok.exe')
+    elif system == 'Darwin':  # MacOS
+        ngrok_path = shutil.which('ngrok') or os.path.expanduser('~/.ngrok2/ngrok')
+    else:  # Linux and other Unix-like systems
+        ngrok_path = shutil.which('ngrok') or '/usr/local/bin/ngrok'
+    
     try:
         subprocess.Popen([ngrok_path, 'http', '5000', f'--domain={NGROK_DOMAIN}'], 
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
