@@ -17,7 +17,8 @@ from database import (
     insert_or_update_album, link_song_artist_album, link_album_song,
     get_all_songs, get_all_artists, get_all_albums,
     get_or_create_user, get_user_playlists, insert_or_update_playlist,
-    link_playlist_song, get_last_sync_timestamp, save_last_sync_timestamp
+    link_playlist_song, get_last_sync_timestamp, save_last_sync_timestamp,
+    get_blacklist, add_to_blacklist, remove_from_blacklist
 )
 
 load_dotenv()
@@ -184,7 +185,8 @@ def process_and_store_track(track, played_at, access_token):
             'id': track['id'],
             'title': track['name'],
             'length_ms': track['duration_ms'],
-            'played_at': played_at
+            'played_at': played_at,
+            'image_url': track['album']['images'][0]['url'] if track['album'].get('images') else None
         }
         
         # Insert/update song
@@ -205,13 +207,15 @@ def process_and_store_track(track, played_at, access_token):
             album_full = album_response.json()
             total_tracks = album_full.get('total_tracks', 0)
             album_length_ms = sum(t['duration_ms'] for t in album_full.get('tracks', {}).get('items', []))
+            album_image_url = album_full['images'][0]['url'] if album_full.get('images') else None
             
             if not insert_or_update_album(
                 album_id,
                 album_title,
                 total_tracks,
                 album_length_ms,
-                track['duration_ms']
+                track['duration_ms'],
+                album_image_url
             ):
                 print(f"  ⚠ Failed to insert album: {album_title}")
                 return
@@ -226,8 +230,15 @@ def process_and_store_track(track, played_at, access_token):
             artist_id = artist['id']
             artist_name = artist['name']
             
+            # Fetch artist details to get image
+            artist_image_url = None
+            artist_response = requests.get(f"{API_BASE_URL}/artists/{artist_id}", headers=headers)
+            if artist_response.status_code == 200:
+                artist_full = artist_response.json()
+                artist_image_url = artist_full['images'][0]['url'] if artist_full.get('images') else None
+            
             # Insert/update artist
-            if not insert_or_update_artist(artist_id, artist_name, track['duration_ms']):
+            if not insert_or_update_artist(artist_id, artist_name, track['duration_ms'], artist_image_url):
                 print(f"  ⚠ Failed to insert artist: {artist_name}")
             else:
                 print(f"  ✓ Artist inserted/updated: {artist_name}")
@@ -307,7 +318,7 @@ def callback():
     # Save token to file for background job
     save_token_to_file(token_info['access_token'], token_info.get('refresh_token', ''), expires_at)
     
-    return redirect('/menu')
+    return redirect('/database_values')
 
 @app.route('/menu')
 def menu():
@@ -383,6 +394,53 @@ def sync_recent():
     
     return redirect('/database_values')
 
+@app.route('/add_to_blacklist', methods=['POST'])
+def add_to_blacklist_route():
+    """Add a playlist to the blacklist"""
+    if 'access_token' not in session:
+        return redirect('/login')
+    
+    playlist_url = request.form.get('playlist_url', '').strip()
+    if not playlist_url:
+        return redirect('/database_values')
+    
+    # Extract playlist ID from URL (supports various Spotify URL formats)
+    playlist_id = None
+    if 'playlist/' in playlist_url:
+        playlist_id = playlist_url.split('playlist/')[-1].split('?')[0]
+    elif len(playlist_url) == 22:  # Direct ID
+        playlist_id = playlist_url
+    
+    if playlist_id:
+        # Fetch playlist details from Spotify
+        headers = {'Authorization': f"Bearer {session['access_token']}"}
+        try:
+            response = requests.get(API_BASE_URL + f'/playlists/{playlist_id}', headers=headers)
+            if response.status_code == 200:
+                playlist_data = response.json()
+                playlist_name = playlist_data.get('name', 'Unknown Playlist')
+                
+                # Get playlist image URL
+                image_url = None
+                if playlist_data.get('images') and len(playlist_data['images']) > 0:
+                    image_url = playlist_data['images'][0]['url']
+                
+                # Add to persistent blacklist with image URL
+                add_to_blacklist(playlist_id, playlist_name, image_url)
+        except Exception as e:
+            print(f"Error adding playlist to blacklist: {e}")
+    
+    return redirect('/database_values')
+
+@app.route('/remove_from_blacklist/<playlist_id>')
+def remove_from_blacklist_route(playlist_id):
+    """Remove a playlist from the blacklist"""
+    if 'access_token' not in session:
+        return redirect('/login')
+    
+    remove_from_blacklist(playlist_id)
+    return redirect('/database_values')
+
 @app.route('/database_values')
 def database_values():
     if 'access_token' not in session:
@@ -431,9 +489,17 @@ def database_values():
         playlists = playlists_response.json()
         if 'items' in playlists:
             for playlist in playlists['items']:
+                # Get the first (usually highest resolution) image if available
+                image_url = None
+                if playlist.get('images') and len(playlist['images']) > 0:
+                    image_url = playlist['images'][0]['url']
+                
+                print(f"Playlist: {playlist['name']}, Image URL: {image_url}")
+                
                 all_playlists.append({
                     'id': playlist['id'],
-                    'name': playlist['name']
+                    'name': playlist['name'],
+                    'image_url': image_url
                 })
     except Exception as e:
         print(f"Error fetching playlists: {e}")
@@ -477,68 +543,369 @@ def database_values():
             'length_formatted': f"{album['length_ms'] // 60000}:{(album['length_ms'] % 60000) // 1000:02d}"
         })
     
-    # Delete old database_values txt files
-    old_files = glob.glob('database_values_*.txt')
-    for old_file in old_files:
-        try:
-            os.remove(old_file)
-        except:
-            pass
+    # Get blacklist from persistent storage
+    blacklist = get_blacklist()
     
-    # Save to txt file
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f'database_values_{timestamp}.txt'
-    
-    with open(filename, 'w', encoding='utf-8') as f:
-        f.write("SPOTIFY STATS - DATABASE VALUES (FROM MYSQL DATABASE)\n")
-        f.write("=" * 80 + "\n\n")
-        
-        f.write("SONG STATISTICS\n")
-        f.write("-" * 80 + "\n\n")
-        
-        for song in song_list:
-            f.write(f"Song ID: {song['id']}\n")
-            f.write(f"Title: {song['title']}\n")
-            f.write(f"Artist(s): {song['artists']}\n")
-            f.write(f"Album: {song['album_title']}\n")
-            f.write(f"Length: {song['length_formatted']}\n")
-            f.write(f"Listen Count: {song['listen_count']}\n")
-            f.write(f"Total Listen Time: {song['listen_time_formatted']}\n")
-            f.write("-" * 80 + "\n")
-        
-        f.write("\n\nARTIST STATISTICS\n")
-        f.write("-" * 80 + "\n\n")
-        
-        for artist in artist_list:
-            f.write(f"Artist ID: {artist['id']}\n")
-            f.write(f"Artist Name: {artist['name']}\n")
-            f.write(f"Total Listens: {artist['listens']}\n")
-            f.write(f"Total Listen Time: {artist['listen_time_formatted']}\n")
-            f.write("-" * 80 + "\n")
-        
-        f.write("\n\nALBUM STATISTICS\n")
-        f.write("-" * 80 + "\n\n")
-        
-        for album in album_list:
-            f.write(f"Album ID: {album['id']}\n")
-            f.write(f"Album Title: {album['title']}\n")
-            f.write(f"Album Listen Time: {album['listen_time_formatted']}\n")
-            f.write(f"Album Listens: {album['listens']}\n")
-            f.write(f"Album Length: {album['length_formatted']}\n")
-            f.write("-" * 80 + "\n")
-    
-    # Build HTML response
+    # Build HTML response with tabs
     html = f"""
+    <style>
+        body {{
+            background-color: #121212;
+            color: #FFFFFF;
+            font-family: Arial, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }}
+        body.light-mode {{
+            background-color: #FFFFFF;
+            color: #000000;
+        }}
+        h1, h2, h3 {{
+            color: #1DB954;
+        }}
+        .tab {{
+            overflow: hidden;
+            border-bottom: 2px solid #1DB954;
+            background-color: #1e1e1e;
+            transition: background-color 0.3s;
+        }}
+        body.light-mode .tab {{
+            background-color: #f1f1f1;
+        }}
+        .tab button {{
+            background-color: inherit;
+            color: #FFFFFF;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 14px 20px;
+            transition: 0.3s;
+            font-size: 16px;
+            font-weight: bold;
+        }}
+        body.light-mode .tab button {{
+            color: #000000;
+        }}
+        .tab button:hover {{
+            background-color: #2a2a2a;
+        }}
+        body.light-mode .tab button:hover {{
+            background-color: #ddd;
+        }}
+        .tab button.active {{
+            background-color: #1DB954;
+            color: white;
+        }}
+        .tabcontent {{
+            display: none;
+            padding: 20px;
+            animation: fadeEffect 0.5s;
+            background-color: #181818;
+            transition: background-color 0.3s;
+        }}
+        body.light-mode .tabcontent {{
+            background-color: #FFFFFF;
+        }}
+        @keyframes fadeEffect {{
+            from {{opacity: 0;}}
+            to {{opacity: 1;}}
+        }}
+        table {{
+            background-color: #1e1e1e;
+            color: #FFFFFF;
+            transition: background-color 0.3s, color 0.3s;
+        }}
+        body.light-mode table {{
+            background-color: #FFFFFF;
+            color: #000000;
+        }}
+        th {{
+            background-color: #1DB954;
+            color: white;
+        }}
+        tr:hover {{
+            background-color: #2a2a2a;
+        }}
+        body.light-mode tr:hover {{
+            background-color: #f0f0f0;
+        }}
+        input[type="number"], input[type="text"] {{
+            background-color: #2a2a2a;
+            color: #FFFFFF;
+            border: 1px solid #1DB954;
+            transition: background-color 0.3s, color 0.3s;
+        }}
+        body.light-mode input[type="number"], body.light-mode input[type="text"] {{
+            background-color: #FFFFFF;
+            color: #000000;
+            border: 1px solid #ccc;
+        }}
+        select {{
+            background-color: #2a2a2a;
+            color: #FFFFFF;
+            border: 1px solid #1DB954;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: background-color 0.3s, color 0.3s;
+        }}
+        body.light-mode select {{
+            background-color: #FFFFFF;
+            color: #000000;
+            border: 1px solid #ccc;
+        }}
+        a {{
+            color: #1DB954;
+        }}
+        a:hover {{
+            color: #1ed760;
+        }}
+        .sort-control {{
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #1e1e1e;
+            border-radius: 5px;
+            display: inline-block;
+            transition: background-color 0.3s;
+        }}
+        body.light-mode .sort-control {{
+            background-color: #f5f5f5;
+        }}
+        .theme-switch-wrapper {{
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            z-index: 1000;
+        }}
+        .theme-switch {{
+            display: inline-block;
+            height: 34px;
+            position: relative;
+            width: 60px;
+        }}
+        .theme-switch input {{
+            display: none;
+        }}
+        .slider {{
+            background-color: #ccc;
+            bottom: 0;
+            cursor: pointer;
+            left: 0;
+            position: absolute;
+            right: 0;
+            top: 0;
+            transition: 0.4s;
+            border-radius: 34px;
+        }}
+        .slider:before {{
+            background-color: #fff;
+            bottom: 4px;
+            content: "";
+            height: 26px;
+            left: 4px;
+            position: absolute;
+            transition: 0.4s;
+            width: 26px;
+            border-radius: 50%;
+        }}
+        input:checked + .slider {{
+            background-color: #1DB954;
+        }}
+        input:checked + .slider:before {{
+            transform: translateX(26px);
+        }}
+        .theme-label {{
+            margin-left: 10px;
+            font-weight: bold;
+        }}
+        .blacklist-container {{
+            transition: background-color 0.3s;
+        }}
+        body.light-mode .blacklist-container {{
+            background-color: #f9f9f9 !important;
+        }}
+        body.light-mode .blacklist-container .blacklist-list {{
+            background-color: #FFFFFF !important;
+        }}
+        .top-item-card {{
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background-color: #1e1e1e;
+            border-radius: 8px;
+            transition: all 0.3s;
+            border: 1px solid #2a2a2a;
+        }}
+        body.light-mode .top-item-card {{
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+        }}
+        .top-item-card:hover {{
+            background-color: #2a2a2a;
+            transform: translateX(5px);
+        }}
+        body.light-mode .top-item-card:hover {{
+            background-color: #e8e8e8;
+        }}
+        .rank-number {{
+            font-size: 32px;
+            font-weight: bold;
+            color: #1DB954;
+            min-width: 60px;
+            text-align: center;
+        }}
+        .item-image {{
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            margin: 0 20px;
+            object-fit: cover;
+        }}
+        .item-info {{
+            flex-grow: 1;
+        }}
+        .item-title {{
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }}
+        .item-subtitle {{
+            color: #b3b3b3;
+            font-size: 14px;
+        }}
+        body.light-mode .item-subtitle {{
+            color: #666;
+        }}
+        .item-stats {{
+            display: flex;
+            gap: 30px;
+            margin-right: 20px;
+            flex-shrink: 0;
+        }}
+        .stat-box {{
+            text-align: center;
+        }}
+        .stat-value {{
+            font-size: 20px;
+            font-weight: bold;
+            color: #1DB954;
+        }}
+        .stat-label {{
+            font-size: 12px;
+            color: #b3b3b3;
+        }}
+        body.light-mode .stat-label {{
+            color: #666;
+        }}
+    </style>
     <script>
         // Auto-refresh page every 2 minutes
         setTimeout(function() {{
             location.reload();
         }}, 120000);
+        
+        // Theme toggle function
+        function toggleTheme() {{
+            document.body.classList.toggle('light-mode');
+            var isLightMode = document.body.classList.contains('light-mode');
+            localStorage.setItem('theme', isLightMode ? 'light' : 'dark');
+        }}
+        
+        // Load saved theme preference
+        function loadTheme() {{
+            var savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'light') {{
+                document.body.classList.add('light-mode');
+                document.getElementById('theme-toggle').checked = true;
+            }}
+        }}
+        
+        function openTab(evt, tabName) {{
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {{
+                tabcontent[i].style.display = "none";
+            }}
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {{
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }}
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }}
+        
+        function syncSongs() {{
+            var limit = document.getElementById('syncLimit').value;
+            window.location.href = '/sync_recent?limit=' + limit;
+        }}
+        
+        function sortTable(tableId, columnIndex) {{
+            var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+            table = document.getElementById(tableId);
+            switching = true;
+            dir = "desc";
+            
+            while (switching) {{
+                switching = false;
+                rows = table.rows;
+                
+                for (i = 1; i < (rows.length - 1); i++) {{
+                    shouldSwitch = false;
+                    x = rows[i].getElementsByTagName("TD")[columnIndex];
+                    y = rows[i + 1].getElementsByTagName("TD")[columnIndex];
+                    
+                    var xValue = parseFloat(x.innerHTML.replace(/:/g, '.')) || x.innerHTML;
+                    var yValue = parseFloat(y.innerHTML.replace(/:/g, '.')) || y.innerHTML;
+                    
+                    if (dir == "desc") {{
+                        if (xValue < yValue) {{
+                            shouldSwitch = true;
+                            break;
+                        }}
+                    }} else if (dir == "asc") {{
+                        if (xValue > yValue) {{
+                            shouldSwitch = true;
+                            break;
+                        }}
+                    }}
+                }}
+                
+                if (shouldSwitch) {{
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                    switchcount++;
+                }} else {{
+                    if (switchcount == 0 && dir == "desc") {{
+                        dir = "asc";
+                        switching = true;
+                    }}
+                }}
+            }}
+        }}
+        
+        // Open first tab by default on page load
+        window.onload = function() {{
+            loadTheme();
+            document.getElementsByClassName("tablinks")[0].click();
+        }}
     </script>
-    <h1>Database Values - Song, Artist & Album Statistics</h1>
-    <p><em>Data saved to: {filename}</em></p>
-    <p><em>Data retrieved from MySQL database (auto-syncs every 2 minutes in background)</em></p>
-    <p><em>🔄 Page auto-refreshes every 2 minutes</em></p>
+    
+    <!-- Theme Toggle Switch -->
+    <div class="theme-switch-wrapper">
+        <label class="theme-switch" for="theme-toggle">
+            <input type="checkbox" id="theme-toggle" onchange="toggleTheme()">
+            <div class="slider"></div>
+        </label>
+        <span class="theme-label">☀️</span>
+    </div>
+    
+    <h1>Spotify Stats Dashboard</h1>
+    
+    <h2>User Information</h2>
+    <p><strong>Username:</strong> {user_username}</p>
     
     <div style="margin: 20px 0;">
         <label for="syncLimit" style="font-weight: bold;">Number of songs to sync (1-50):</label>
@@ -547,112 +914,267 @@ def database_values():
             🔄 Sync Recent Songs
         </button>
     </div>
-    <script>
-        function syncSongs() {{
-            var limit = document.getElementById('syncLimit').value;
-            window.location.href = '/sync_recent?limit=' + limit;
-        }}
-    </script>
     
-    <h2>User Information</h2>
-    <p><strong>Username:</strong> {user_username}</p>
-    <p><strong>User ID:</strong> {user_id}</p>
+    <div class="blacklist-container" style="margin: 20px 0; padding: 15px; border: 2px solid #1DB954; border-radius: 8px; background-color: #1e1e1e;">
+        <h3 style="margin-top: 0;">🚫 Blacklist</h3>
+        <form method="POST" action="/add_to_blacklist" style="margin-bottom: 15px;">
+            <label for="playlist_url" style="font-weight: bold;">Playlist URL or ID:</label>
+            <input type="text" id="playlist_url" name="playlist_url" placeholder="https://open.spotify.com/playlist/..." style="width: 400px; padding: 8px; margin: 0 10px; font-size: 14px;">
+            <button type="submit" style="padding: 8px 16px; background-color: #dc3545; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px;">
+                Blacklist
+            </button>
+        </form>
+        <div class="blacklist-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #1DB954; padding: 10px; background-color: #2a2a2a; border-radius: 4px;">
+            <strong>Blacklisted Playlists:</strong>
+            <ul style="list-style-type: none; padding-left: 0; margin: 10px 0 0 0;">
+    """
     
-    <h2>Song Statistics</h2>
-    <table border="1" style="border-collapse: collapse; width: 100%;">
-        <tr>
-            <th style="padding: 10px;">Song ID</th>
-            <th style="padding: 10px;">Title</th>
-            <th style="padding: 10px;">Artist(s)</th>
-            <th style="padding: 10px;">Album</th>
-            <th style="padding: 10px;">Length</th>
-            <th style="padding: 10px;">Listen Count</th>
-            <th style="padding: 10px;">Total Listen Time</th>
-        </tr>
+    if blacklist:
+        for playlist in blacklist:
+            # Display image if available, otherwise use bullet
+            playlist_icon = ""
+            if playlist.get('image_url'):
+                playlist_icon = f'<img src="{playlist["image_url"]}" alt="" style="width: 40px; height: 40px; margin-right: 10px; border-radius: 4px; vertical-align: middle;">'
+            else:
+                playlist_icon = "• "
+            
+            html += f"""<li style='padding: 5px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;'>
+                <span style='display: flex; align-items: center;'>{playlist_icon}{playlist['name']}</span>
+                <a href='/remove_from_blacklist/{playlist['id']}' style='color: #dc3545; text-decoration: none; font-weight: bold; font-size: 18px; cursor: pointer; padding: 0 10px;' title='Remove from blacklist'>✕</a>
+            </li>"""
+    else:
+        html += "<li style='color: #888; font-style: italic;'>No playlists blacklisted yet</li>"
+    
+    html += """
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Tab Navigation -->
+    <div class="tab">
+        <button class="tablinks" onclick="openTab(event, 'Statistics')">Statistics</button>
+        <button class="tablinks" onclick="openTab(event, 'TopSongs')">Top Songs</button>
+        <button class="tablinks" onclick="openTab(event, 'TopArtists')">Top Artists</button>
+        <button class="tablinks" onclick="openTab(event, 'TopAlbums')">Top Albums</button>
+    </div>
+    
+    <!-- Statistics Tab -->
+    <div id="Statistics" class="tabcontent">
+        <h2>Song Statistics</h2>
+        <table border="1" style="border-collapse: collapse; width: 100%;">
+            <tr>
+                <th style="padding: 10px;">Title</th>
+                <th style="padding: 10px;">Artist(s)</th>
+                <th style="padding: 10px;">Album</th>
+                <th style="padding: 10px;">Length</th>
+                <th style="padding: 10px;">Listen Count</th>
+                <th style="padding: 10px;">Total Listen Time</th>
+            </tr>
     """
     
     for song in song_list:
         html += f"""
-        <tr>
-            <td style="padding: 10px;">{song['id']}</td>
-            <td style="padding: 10px;">{song['title']}</td>
-            <td style="padding: 10px;">{song['artists']}</td>
-            <td style="padding: 10px;">{song['album_title']}</td>
-            <td style="padding: 10px;">{song['length_formatted']}</td>
-            <td style="padding: 10px;">{song['listen_count']}</td>
-            <td style="padding: 10px;">{song['listen_time_formatted']}</td>
-        </tr>
+            <tr>
+                <td style="padding: 10px;">{song['title']}</td>
+                <td style="padding: 10px;">{song['artists']}</td>
+                <td style="padding: 10px;">{song['album_title']}</td>
+                <td style="padding: 10px;">{song['length_formatted']}</td>
+                <td style="padding: 10px;">{song['listen_count']}</td>
+                <td style="padding: 10px;">{song['listen_time_formatted']}</td>
+            </tr>
         """
     
     html += """
-    </table>
-    
-    <h2>Artist Statistics</h2>
-    <table border="1" style="border-collapse: collapse; width: 100%;">
-        <tr>
-            <th style="padding: 10px;">Artist ID</th>
-            <th style="padding: 10px;">Artist Name</th>
-            <th style="padding: 10px;">Total Listens</th>
-            <th style="padding: 10px;">Total Listen Time</th>
-        </tr>
+        </table>
+        
+        <h2>Artist Statistics</h2>
+        <table border="1" style="border-collapse: collapse; width: 100%;">
+            <tr>
+                <th style="padding: 10px;">Artist Name</th>
+                <th style="padding: 10px;">Total Listens</th>
+                <th style="padding: 10px;">Total Listen Time</th>
+            </tr>
     """
     
     for artist in artist_list:
         html += f"""
-        <tr>
-            <td style="padding: 10px;">{artist['id']}</td>
-            <td style="padding: 10px;">{artist['name']}</td>
-            <td style="padding: 10px;">{artist['listens']}</td>
-            <td style="padding: 10px;">{artist['listen_time_formatted']}</td>
-        </tr>
+            <tr>
+                <td style="padding: 10px;">{artist['name']}</td>
+                <td style="padding: 10px;">{artist['listens']}</td>
+                <td style="padding: 10px;">{artist['listen_time_formatted']}</td>
+            </tr>
         """
     
     html += """
-    </table>
-    
-    <h2>Album Statistics</h2>
-    <table border="1" style="border-collapse: collapse; width: 100%;">
-        <tr>
-            <th style="padding: 10px;">Album ID</th>
-            <th style="padding: 10px;">Album Title</th>
-            <th style="padding: 10px;">Total Listen Time</th>
-            <th style="padding: 10px;">Album Listens</th>
-            <th style="padding: 10px;">Album Length</th>
-        </tr>
+        </table>
+        
+        <h2>Album Statistics</h2>
+        <table border="1" style="border-collapse: collapse; width: 100%;">
+            <tr>
+                <th style="padding: 10px;">Album Title</th>
+                <th style="padding: 10px;">Total Listen Time</th>
+                <th style="padding: 10px;">Album Listens</th>
+                <th style="padding: 10px;">Album Length</th>
+            </tr>
     """
     
     for album in album_list:
         html += f"""
-        <tr>
-            <td style="padding: 10px;">{album['id']}</td>
-            <td style="padding: 10px;">{album['title']}</td>
-            <td style="padding: 10px;">{album['listen_time_formatted']}</td>
-            <td style="padding: 10px;">{album['listens']}</td>
-            <td style="padding: 10px;">{album['length_formatted']}</td>
-        </tr>
+            <tr>
+                <td style="padding: 10px;">{album['title']}</td>
+                <td style="padding: 10px;">{album['listen_time_formatted']}</td>
+                <td style="padding: 10px;">{album['listens']}</td>
+                <td style="padding: 10px;">{album['length_formatted']}</td>
+            </tr>
         """
     
     html += """
-    </table>
-    
-    <h2>Your Playlists</h2>
-    <table border="1" style="border-collapse: collapse; width: 100%;">
-        <tr>
-            <th style="padding: 10px;">Playlist ID</th>
-            <th style="padding: 10px;">Playlist Name</th>
-        </tr>
+        </table>
+        
+        <h2>Your Playlists</h2>
+        <table border="1" style="border-collapse: collapse; width: 100%;">
+            <tr>
+                <th style="padding: 10px;">Playlist Name</th>
+            </tr>
     """
     
     for playlist in all_playlists:
+        playlist_display = ""
+        if playlist.get('image_url'):
+            playlist_display = f'<img src="{playlist["image_url"]}" alt="{playlist["name"]}" style="width: 50px; height: 50px; margin-right: 10px; vertical-align: middle; border-radius: 4px;"> {playlist["name"]}'
+        else:
+            playlist_display = playlist['name']
+        
         html += f"""
-        <tr>
-            <td style="padding: 10px;">{playlist['id']}</td>
-            <td style="padding: 10px;">{playlist['name']}</td>
-        </tr>
+            <tr>
+                <td style="padding: 10px;">{playlist_display}</td>
+            </tr>
         """
     
     html += """
-    </table>
+        </table>
+    </div>
+    
+    <!-- Top Songs Tab -->
+    <div id="TopSongs" class="tabcontent">
+        <h2>Top Songs</h2>
+        <div class="sort-control">
+            <label for="songSort" style="font-weight: bold; margin-right: 10px;">Sort by:</label>
+            <select id="songSort" onchange="location.reload()">
+                <option value="listens">Listen Count</option>
+                <option value="time">Total Listen Time</option>
+            </select>
+        </div>
+    """
+    
+    for idx, song in enumerate(song_list[:50], 1):  # Top 50 songs
+        # Use actual album art or fallback to SVG placeholder
+        img_url = song.get('image_url') or "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' fill='%231DB954'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='40' fill='white'%3E♪%3C/text%3E%3C/svg%3E"
+        
+        html += f"""
+        <div class="top-item-card">
+            <div class="rank-number">{idx}</div>
+            <img src="{img_url}" alt="{song['title']}" class="item-image">
+            <div class="item-info">
+                <div class="item-title">{song['title']} - {song['artists']}</div>
+                <div class="item-subtitle">{song['album_title']}</div>
+            </div>
+            <div class="item-stats">
+                <div class="stat-box">
+                    <div class="stat-value">{song['listen_count']}</div>
+                    <div class="stat-label">Plays</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{song['listen_time_formatted']}</div>
+                    <div class="stat-label">Time</div>
+                </div>
+            </div>
+        </div>
+        """
+    
+    html += """
+    </div>
+    
+    <!-- Top Artists Tab -->
+    <div id="TopArtists" class="tabcontent">
+        <h2>Top Artists</h2>
+        <div class="sort-control">
+            <label for="artistSort" style="font-weight: bold; margin-right: 10px;">Sort by:</label>
+            <select id="artistSort" onchange="location.reload()">
+                <option value="listens">Total Listens</option>
+                <option value="time">Total Listen Time</option>
+            </select>
+        </div>
+    """
+    
+    for idx, artist in enumerate(artist_list[:50], 1):  # Top 50 artists
+        # Use actual artist image or fallback to SVG placeholder
+        img_url = artist.get('image_url') or "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' fill='%231DB954'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='35' fill='white'%3E🎤%3C/text%3E%3C/svg%3E"
+        
+        html += f"""
+        <div class="top-item-card">
+            <div class="rank-number">{idx}</div>
+            <img src="{img_url}" alt="{artist['name']}" class="item-image">
+            <div class="item-info">
+                <div class="item-title">{artist['name']}</div>
+                <div class="item-subtitle">Artist</div>
+            </div>
+            <div class="item-stats">
+                <div class="stat-box">
+                    <div class="stat-value">{artist['listens']}</div>
+                    <div class="stat-label">Listens</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{artist['listen_time_formatted']}</div>
+                    <div class="stat-label">Time</div>
+                </div>
+            </div>
+        </div>
+        """
+    
+    html += """
+    </div>
+    
+    <!-- Top Albums Tab -->
+    <div id="TopAlbums" class="tabcontent">
+        <h2>Top Albums</h2>
+        <div class="sort-control">
+            <label for="albumSort" style="font-weight: bold; margin-right: 10px;">Sort by:</label>
+            <select id="albumSort" onchange="location.reload()">
+                <option value="listens">Album Listens</option>
+                <option value="time">Total Listen Time</option>
+            </select>
+        </div>
+    """
+    
+    for idx, album in enumerate(album_list[:50], 1):  # Top 50 albums
+        # Use actual album image or fallback to SVG placeholder
+        img_url = album.get('image_url') or "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' fill='%231DB954'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='35' fill='white'%3E💿%3C/text%3E%3C/svg%3E"
+        
+        html += f"""
+        <div class="top-item-card">
+            <div class="rank-number">{idx}</div>
+            <img src="{img_url}" alt="{album['title']}" class="item-image">
+            <div class="item-info">
+                <div class="item-title">{album['title']}</div>
+                <div class="item-subtitle">Album • {album['length_formatted']}</div>
+            </div>
+            <div class="item-stats">
+                <div class="stat-box">
+                    <div class="stat-value">{album['listens']}</div>
+                    <div class="stat-label">Listens</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{album['listen_time_formatted']}</div>
+                    <div class="stat-label">Time</div>
+                </div>
+            </div>
+        </div>
+        """
+    
+    html += """
+        </table>
+    </div>
     
     <br>
     <a href='/menu'>Back to menu</a> | <a href='/'>Back to home</a>

@@ -1,6 +1,7 @@
 import mysql.connector
 from mysql.connector import Error
 import os
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -64,6 +65,18 @@ def insert_or_update_song(song_data):
             connection.commit()
             print("✓ Added last_played column to Songs table")
         
+        # Add image_url column if it doesn't exist
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = 'spotifyDatabase' 
+            AND TABLE_NAME = 'Songs' 
+            AND COLUMN_NAME = 'image_url'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("ALTER TABLE Songs ADD COLUMN image_url VARCHAR(500) DEFAULT NULL")
+            connection.commit()
+            print("✓ Added image_url column to Songs table")
+        
         # Convert played_at to MySQL datetime format if it exists
         played_at = song_data.get('played_at')
         if played_at and hasattr(played_at, 'strftime'):
@@ -81,14 +94,14 @@ def insert_or_update_song(song_data):
             new_listen_time = result[1] + song_data['length_ms']
             cursor.execute("""
                 UPDATE Songs 
-                SET S_Listens = %s, S_Listen_Time = %s, last_played = %s, flag = 1
+                SET S_Listens = %s, S_Listen_Time = %s, last_played = %s, image_url = %s, flag = 1
                 WHERE S_ID = %s
-            """, (new_listen_count, new_listen_time, played_at_str, song_data['id']))
+            """, (new_listen_count, new_listen_time, played_at_str, song_data.get('image_url'), song_data['id']))
         else:
             # Insert new song
             cursor.execute("""
-                INSERT INTO Songs (S_ID, S_Title, S_Length, S_Listens, S_Listen_Time, last_played, flag)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO Songs (S_ID, S_Title, S_Length, S_Listens, S_Listen_Time, last_played, image_url, flag)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 song_data['id'],
                 song_data['title'][:50],  # Limit to 50 chars per schema
@@ -96,6 +109,7 @@ def insert_or_update_song(song_data):
                 1,
                 song_data['length_ms'],
                 played_at_str,
+                song_data.get('image_url'),
                 1
             ))
         
@@ -109,7 +123,7 @@ def insert_or_update_song(song_data):
         if connection.is_connected():
             connection.close()
 
-def insert_or_update_artist(artist_id, artist_name, song_length_ms):
+def insert_or_update_artist(artist_id, artist_name, song_length_ms, image_url=None):
     """Insert a new artist or update existing artist's stats"""
     connection = get_db_connection()
     if not connection:
@@ -117,6 +131,18 @@ def insert_or_update_artist(artist_id, artist_name, song_length_ms):
     
     try:
         cursor = connection.cursor()
+        
+        # Add image_url column if it doesn't exist
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = 'spotifyDatabase' 
+            AND TABLE_NAME = 'Artists' 
+            AND COLUMN_NAME = 'image_url'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("ALTER TABLE Artists ADD COLUMN image_url VARCHAR(500) DEFAULT NULL")
+            connection.commit()
+            print("✓ Added image_url column to Artists table")
         
         # Check if artist exists
         cursor.execute("SELECT A_Listens, A_ListenTime FROM Artists WHERE A_ID = %s", (artist_id,))
@@ -128,15 +154,15 @@ def insert_or_update_artist(artist_id, artist_name, song_length_ms):
             new_listen_time = result[1] + song_length_ms
             cursor.execute("""
                 UPDATE Artists 
-                SET A_Listens = %s, A_ListenTime = %s, flag = 1
+                SET A_Listens = %s, A_ListenTime = %s, image_url = %s, flag = 1
                 WHERE A_ID = %s
-            """, (new_listens, new_listen_time, artist_id))
+            """, (new_listens, new_listen_time, image_url, artist_id))
         else:
             # Insert new artist
             cursor.execute("""
-                INSERT INTO Artists (A_ID, A_Name, A_Listens, A_ListenTime, flag)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (artist_id, artist_name[:50], 1, song_length_ms, 1))
+                INSERT INTO Artists (A_ID, A_Name, A_Listens, A_ListenTime, image_url, flag)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (artist_id, artist_name[:50], 1, song_length_ms, image_url, 1))
         
         connection.commit()
         cursor.close()
@@ -193,7 +219,7 @@ def link_album_song(album_id, song_id):
         if connection.is_connected():
             connection.close()
 
-def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms, song_length_ms):
+def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms, song_length_ms, image_url=None):
     """Insert a new album or update existing album's stats
     Note: A_Listens will be calculated as MIN(song listens) only if ALL tracks have been listened to"""
     connection = get_db_connection()
@@ -214,6 +240,18 @@ def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms,
             cursor.execute("ALTER TABLE Albums ADD COLUMN total_tracks INT DEFAULT NULL")
             connection.commit()
             print("✓ Added total_tracks column to Albums table")
+        
+        # Add image_url column if it doesn't exist
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = 'spotifyDatabase' 
+            AND TABLE_NAME = 'Albums' 
+            AND COLUMN_NAME = 'image_url'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("ALTER TABLE Albums ADD COLUMN image_url VARCHAR(500) DEFAULT NULL")
+            connection.commit()
+            print("✓ Added image_url column to Albums table")
         
         # Check if album exists
         cursor.execute("SELECT A_Listen_Time, total_tracks FROM Albums WHERE A_ID = %s", (album_id,))
@@ -251,15 +289,15 @@ def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms,
             
             cursor.execute("""
                 UPDATE Albums 
-                SET A_Listen_Time = %s, A_Listens = %s, total_tracks = %s, flag = 1
+                SET A_Listen_Time = %s, A_Listens = %s, total_tracks = %s, image_url = %s, flag = 1
                 WHERE A_ID = %s
-            """, (new_listen_time, complete_listens, stored_total_tracks, album_id))
+            """, (new_listen_time, complete_listens, stored_total_tracks, image_url, album_id))
         else:
             # Insert new album with 0 listens initially
             cursor.execute("""
-                INSERT INTO Albums (A_ID, A_Title, A_Listen_Time, A_Listens, A_Length, total_tracks, flag)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (album_id, album_title[:50], song_length_ms, 0, album_length_ms, total_tracks, 1))
+                INSERT INTO Albums (A_ID, A_Title, A_Listen_Time, A_Listens, A_Length, total_tracks, image_url, flag)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (album_id, album_title[:50], song_length_ms, 0, album_length_ms, total_tracks, image_url, 1))
         
         connection.commit()
         cursor.close()
@@ -289,21 +327,48 @@ def get_all_songs():
         """)
         has_last_played = cursor.fetchone()['COUNT(*)'] > 0
         
+        # Check if image_url column exists
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = 'spotifyDatabase' 
+            AND TABLE_NAME = 'Songs' 
+            AND COLUMN_NAME = 'image_url'
+        """)
+        has_image_url = cursor.fetchone()['COUNT(*)'] > 0
+        
         # Build query based on column existence
-        if has_last_played:
+        if has_last_played and has_image_url:
             cursor.execute("""
                 SELECT S_ID as id, S_Title as title, S_Length as length_ms, 
                        S_Listens as listen_count, S_Listen_Time as listen_time_ms,
-                       last_played, '' as artists, '' as album_title
+                       last_played, image_url, '' as artists, '' as album_title
                 FROM Songs
                 WHERE flag = 1
                 ORDER BY last_played DESC, S_Listens DESC
+            """)
+        elif has_last_played:
+            cursor.execute("""
+                SELECT S_ID as id, S_Title as title, S_Length as length_ms, 
+                       S_Listens as listen_count, S_Listen_Time as listen_time_ms,
+                       last_played, NULL as image_url, '' as artists, '' as album_title
+                FROM Songs
+                WHERE flag = 1
+                ORDER BY last_played DESC, S_Listens DESC
+            """)
+        elif has_image_url:
+            cursor.execute("""
+                SELECT S_ID as id, S_Title as title, S_Length as length_ms, 
+                       S_Listens as listen_count, S_Listen_Time as listen_time_ms,
+                       NULL as last_played, image_url, '' as artists, '' as album_title
+                FROM Songs
+                WHERE flag = 1
+                ORDER BY S_Listens DESC
             """)
         else:
             cursor.execute("""
                 SELECT S_ID as id, S_Title as title, S_Length as length_ms, 
                        S_Listens as listen_count, S_Listen_Time as listen_time_ms,
-                       NULL as last_played, '' as artists, '' as album_title
+                       NULL as last_played, NULL as image_url, '' as artists, '' as album_title
                 FROM Songs
                 WHERE flag = 1
                 ORDER BY S_Listens DESC
@@ -350,13 +415,32 @@ def get_all_artists():
     
     try:
         cursor = connection.cursor(dictionary=True)
+        
+        # Check if image_url column exists
         cursor.execute("""
-            SELECT A_ID as id, A_Name as name, A_Listens as listens, 
-                   A_ListenTime as listen_time_ms
-            FROM Artists
-            WHERE flag = 1
-            ORDER BY A_Listens DESC
+            SELECT COUNT(*) FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = 'spotifyDatabase' 
+            AND TABLE_NAME = 'Artists' 
+            AND COLUMN_NAME = 'image_url'
         """)
+        has_image_url = cursor.fetchone()['COUNT(*)'] > 0
+        
+        if has_image_url:
+            cursor.execute("""
+                SELECT A_ID as id, A_Name as name, A_Listens as listens, 
+                       A_ListenTime as listen_time_ms, image_url
+                FROM Artists
+                WHERE flag = 1
+                ORDER BY A_Listens DESC
+            """)
+        else:
+            cursor.execute("""
+                SELECT A_ID as id, A_Name as name, A_Listens as listens, 
+                       A_ListenTime as listen_time_ms, NULL as image_url
+                FROM Artists
+                WHERE flag = 1
+                ORDER BY A_Listens DESC
+            """)
         artists = cursor.fetchall()
         cursor.close()
         return artists
@@ -375,13 +459,32 @@ def get_all_albums():
     
     try:
         cursor = connection.cursor(dictionary=True)
+        
+        # Check if image_url column exists
         cursor.execute("""
-            SELECT A_ID as id, A_Title as title, A_Listen_Time as listen_time_ms, 
-                   A_Listens as listens, A_Length as length_ms
-            FROM Albums
-            WHERE flag = 1
-            ORDER BY A_Listens DESC
+            SELECT COUNT(*) FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = 'spotifyDatabase' 
+            AND TABLE_NAME = 'Albums' 
+            AND COLUMN_NAME = 'image_url'
         """)
+        has_image_url = cursor.fetchone()['COUNT(*)'] > 0
+        
+        if has_image_url:
+            cursor.execute("""
+                SELECT A_ID as id, A_Title as title, A_Listen_Time as listen_time_ms, 
+                       A_Listens as listens, A_Length as length_ms, image_url
+                FROM Albums
+                WHERE flag = 1
+                ORDER BY A_Listens DESC
+            """)
+        else:
+            cursor.execute("""
+                SELECT A_ID as id, A_Title as title, A_Listen_Time as listen_time_ms, 
+                       A_Listens as listens, A_Length as length_ms, NULL as image_url
+                FROM Albums
+                WHERE flag = 1
+                ORDER BY A_Listens DESC
+            """)
         albums = cursor.fetchall()
         cursor.close()
         return albums
@@ -523,6 +626,45 @@ def save_last_sync_timestamp(timestamp):
             f.write(timestamp)
     except Exception as e:
         print(f"Error saving last sync timestamp: {e}")
+
+def get_blacklist():
+    """Get the blacklist from persistent storage"""
+    try:
+        if os.path.exists('blacklist.json'):
+            with open('blacklist.json', 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Error reading blacklist: {e}")
+    return []
+
+def save_blacklist(blacklist):
+    """Save the blacklist to persistent storage"""
+    try:
+        with open('blacklist.json', 'w', encoding='utf-8') as f:
+            json.dump(blacklist, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"Error saving blacklist: {e}")
+
+def add_to_blacklist(playlist_id, playlist_name, image_url=None):
+    """Add a playlist to the blacklist"""
+    blacklist = get_blacklist()
+    # Avoid duplicates
+    if not any(p['id'] == playlist_id for p in blacklist):
+        blacklist.append({
+            'id': playlist_id,
+            'name': playlist_name,
+            'image_url': image_url
+        })
+        save_blacklist(blacklist)
+        return True
+    return False
+
+def remove_from_blacklist(playlist_id):
+    """Remove a playlist from the blacklist"""
+    blacklist = get_blacklist()
+    blacklist = [p for p in blacklist if p['id'] != playlist_id]
+    save_blacklist(blacklist)
+    return True
 
 def check_if_play_exists(song_id, played_at_timestamp):
     """Check if a specific play (song + timestamp) has already been processed"""
