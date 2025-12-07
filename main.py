@@ -1,9 +1,9 @@
 import os
 import requests
 import urllib.parse
+import json
 import subprocess
 import time
-import json
 
 from flask import Flask, redirect, request, session, jsonify
 from datetime import datetime, timedelta
@@ -26,8 +26,13 @@ def start_ngrok():
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         time.sleep(2)  # Give ngrok time to start
         print("✓ ngrok tunnel started successfully")
+        print(f"   App available at: https://{NGROK_DOMAIN}")
+        print(f"\n   IMPORTANT: Your professor must configure ngrok authtoken on their machine:")
+        print(f"   ngrok config add-authtoken 2vxIYJpjk30G6C6CWl6NKRT8aZx_6ZubgvFvfvquPBLbohmwz")
+        print(f"\n   See SETUP.md for full instructions.\n")
     except Exception as e:
         print(f"Warning: Could not start ngrok: {e}")
+        print(f"   Make sure ngrok is installed. See SETUP.md for instructions.")
 
 start_ngrok()
 
