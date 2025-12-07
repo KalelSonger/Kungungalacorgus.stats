@@ -1,4 +1,7 @@
 Flask
 requests
 gunicorn
+mysql-connector-python
+python-dotenv
+APScheduler
 

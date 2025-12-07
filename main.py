@@ -116,9 +116,11 @@ start_ngrok()
 
 def sync_recent_plays_background():
     """Background job to sync recent plays - runs every 2 minutes"""
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Background sync job started...")
     try:
         token_data = load_token_from_file()
         if not token_data:
+            print("⚠ No token file found - please log in through the web interface first")
             return
         
         # Check if token expired and refresh if needed
@@ -175,35 +177,27 @@ scheduler.add_job(func=sync_recent_plays_background, trigger="interval", minutes
 def process_and_store_track(track, played_at, access_token):
     """Process a track and store it in the database with all related data"""
     try:
+        print(f"\n[Processing] {track['name']} by {', '.join([a['name'] for a in track['artists']])}")
+        
         # Prepare song data
         song_data = {
             'id': track['id'],
             'title': track['name'],
-            'length_ms': track['duration_ms']
+            'length_ms': track['duration_ms'],
+            'played_at': played_at
         }
         
         # Insert/update song
-        insert_or_update_song(song_data)
+        if not insert_or_update_song(song_data):
+            print(f"⚠ Failed to insert song: {track['name']}")
+            return
+        print(f"  ✓ Song inserted/updated")
         
         # Get album info
         album_id = track['album']['id']
         album_title = track['album']['name']
         
-        # Process each artist and create Creates relationship
-        for artist in track['artists']:
-            artist_id = artist['id']
-            artist_name = artist['name']
-            
-            # Insert/update artist
-            insert_or_update_artist(artist_id, artist_name, track['duration_ms'])
-            
-            # Link artist, song, and album in Creates table
-            link_song_artist_album(track['id'], artist_id, album_id)
-        
-        # Link album and song in Album_Song table
-        link_album_song(album_id, track['id'])
-        
-        # Get full album details for accurate data
+        # Get full album details and INSERT ALBUM FIRST (before creating foreign key links)
         headers = {'Authorization': f"Bearer {access_token}"}
         album_response = requests.get(f"{API_BASE_URL}/albums/{album_id}", headers=headers)
         
@@ -212,15 +206,45 @@ def process_and_store_track(track, played_at, access_token):
             total_tracks = album_full.get('total_tracks', 0)
             album_length_ms = sum(t['duration_ms'] for t in album_full.get('tracks', {}).get('items', []))
             
-            insert_or_update_album(
+            if not insert_or_update_album(
                 album_id,
                 album_title,
                 total_tracks,
                 album_length_ms,
                 track['duration_ms']
-            )
+            ):
+                print(f"  ⚠ Failed to insert album: {album_title}")
+                return
+            else:
+                print(f"  ✓ Album inserted/updated: {album_title}")
+        else:
+            print(f"  ⚠ Failed to fetch album details for {album_title}: {album_response.status_code}")
+            return
+        
+        # NOW process artists and create relationships (album exists now!)
+        for artist in track['artists']:
+            artist_id = artist['id']
+            artist_name = artist['name']
+            
+            # Insert/update artist
+            if not insert_or_update_artist(artist_id, artist_name, track['duration_ms']):
+                print(f"  ⚠ Failed to insert artist: {artist_name}")
+            else:
+                print(f"  ✓ Artist inserted/updated: {artist_name}")
+            
+            # Link artist, song, and album in Creates table
+            if not link_song_artist_album(track['id'], artist_id, album_id):
+                print(f"  ⚠ Failed to link song-artist-album for: {track['name']}")
+            else:
+                print(f"  ✓ Linked artist-song-album")
+        
+        # Link album and song in Album_Song table
+        if not link_album_song(album_id, track['id']):
+            print(f"  ⚠ Failed to link album-song for: {track['name']}")
+        else:
+            print(f"  ✓ Linked album-song")
     except Exception as e:
-        print(f"Error processing track: {e}")
+        print(f"❌ Error processing track '{track.get('name', 'Unknown')}': {e}")
 
 AUTH_URL = 'https://accounts.spotify.com/authorize'
 TOKEN_URL = 'https://accounts.spotify.com/api/token'
@@ -302,22 +326,30 @@ def menu():
     
     return html
 
-@app.route('/database_values')
-def database_values():
+@app.route('/sync_recent')
+def sync_recent():
+    """Sync recent songs from Spotify with variable limit"""
     if 'access_token' not in session:
         return redirect('/login')
     
     if datetime.now().timestamp() > session['expires_at']:
         return redirect('/refresh_token')
     
+    # Get limit from query parameter, default to 10
+    try:
+        limit = int(request.args.get('limit', 10))
+        # Cap at 50 (Spotify API limit)
+        limit = min(max(1, limit), 50)
+    except ValueError:
+        limit = 10
+    
     headers = {
         'Authorization': f"Bearer {session['access_token']}"
     }
     
-    # Sync recent songs from Spotify API (only new plays)
     try:
         last_sync = get_last_sync_timestamp()
-        recent_response = requests.get(API_BASE_URL + '/me/player/recently-played?limit=50', headers=headers)
+        recent_response = requests.get(API_BASE_URL + f'/me/player/recently-played?limit={limit}', headers=headers)
         
         if recent_response.status_code == 200:
             recent_data = recent_response.json()
@@ -344,11 +376,25 @@ def database_values():
                     process_and_store_track(track, played_at_dt, session['access_token'])
                 
                 save_last_sync_timestamp(latest_timestamp)
-                print(f"✓ Page load sync: Processed {len(new_plays)} new track(s)")
+                print(f"✓ Manual sync: Processed {len(new_plays)} new track(s)")
             else:
-                print("✓ Page load sync: No new plays to process")
+                print("✓ Manual sync: No new plays to process")
     except Exception as e:
         print(f"Error syncing recent plays: {e}")
+    
+    return redirect('/database_values')
+
+@app.route('/database_values')
+def database_values():
+    if 'access_token' not in session:
+        return redirect('/login')
+    
+    if datetime.now().timestamp() > session['expires_at']:
+        return redirect('/refresh_token')
+    
+    headers = {
+        'Authorization': f"Bearer {session['access_token']}"
+    }
     
     # Get user profile for display
     try:
@@ -484,9 +530,30 @@ def database_values():
     
     # Build HTML response
     html = f"""
+    <script>
+        // Auto-refresh page every 2 minutes
+        setTimeout(function() {{
+            location.reload();
+        }}, 120000);
+    </script>
     <h1>Database Values - Song, Artist & Album Statistics</h1>
     <p><em>Data saved to: {filename}</em></p>
     <p><em>Data retrieved from MySQL database (auto-syncs every 2 minutes in background)</em></p>
+    <p><em>🔄 Page auto-refreshes every 2 minutes</em></p>
+    
+    <div style="margin: 20px 0;">
+        <label for="syncLimit" style="font-weight: bold;">Number of songs to sync (1-50):</label>
+        <input type="number" id="syncLimit" min="1" max="50" value="10" style="width: 80px; padding: 8px; margin: 0 10px; font-size: 16px;">
+        <button onclick="syncSongs()" style="padding: 10px 20px; background-color: #1DB954; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 16px;">
+            🔄 Sync Recent Songs
+        </button>
+    </div>
+    <script>
+        function syncSongs() {{
+            var limit = document.getElementById('syncLimit').value;
+            window.location.href = '/sync_recent?limit=' + limit;
+        }}
+    </script>
     
     <h2>User Information</h2>
     <p><strong>Username:</strong> {user_username}</p>
