@@ -356,29 +356,28 @@ def sync_recent():
             items = recent_data.get('items', [])
             
             # Process items in reverse order (oldest first)
-            new_plays = []
+            processed_count = 0
             latest_timestamp = last_sync
             
             for item in reversed(items):
+                track = item['track']
                 played_at = item['played_at']
+                played_at_dt = datetime.fromisoformat(item['played_at'].replace('Z', '+00:00'))
                 
-                # Only process plays newer than our last sync
-                if last_sync is None or played_at > last_sync:
-                    new_plays.append(item)
-                    if latest_timestamp is None or played_at > latest_timestamp:
-                        latest_timestamp = played_at
+                # Process the track
+                process_and_store_track(track, played_at_dt, session['access_token'])
+                processed_count += 1
+                
+                # Track the latest timestamp (only update if this is newer)
+                if latest_timestamp is None or played_at > latest_timestamp:
+                    latest_timestamp = played_at
             
-            # Process new plays
-            if new_plays:
-                for item in new_plays:
-                    track = item['track']
-                    played_at_dt = datetime.fromisoformat(item['played_at'].replace('Z', '+00:00'))
-                    process_and_store_track(track, played_at_dt, session['access_token'])
-                
+            # Save the latest timestamp if we processed any tracks
+            if processed_count > 0 and latest_timestamp is not None:
                 save_last_sync_timestamp(latest_timestamp)
-                print(f"✓ Manual sync: Processed {len(new_plays)} new track(s)")
+                print(f"✓ Manual sync: Processed {processed_count} track(s)")
             else:
-                print("✓ Manual sync: No new plays to process")
+                print("✓ Manual sync: No plays to process")
     except Exception as e:
         print(f"Error syncing recent plays: {e}")
     

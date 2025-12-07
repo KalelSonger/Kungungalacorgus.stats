@@ -1,0 +1,937 @@
+SPOTIFY STATS - DATABASE VALUES (FROM MYSQL DATABASE)
+================================================================================
+
+SONG STATISTICS
+--------------------------------------------------------------------------------
+
+Song ID: 3EAcsZy8hsDrDoTaM13ewu
+Title: I Could Die for You
+Artist(s): Red Hot Chili Peppers
+Album: By the Way
+Length: 3:12
+Listen Count: 2
+Total Listen Time: 6:25
+--------------------------------------------------------------------------------
+Song ID: 7h53I92e7QVQPh6269l6qd
+Title: Sober Together
+Artist(s): Blondshell
+Album: Blondshell
+Length: 4:02
+Listen Count: 2
+Total Listen Time: 8:04
+--------------------------------------------------------------------------------
+Song ID: 12KUFSHFgT0XCoiSlvdQi4
+Title: Break Free
+Artist(s): Zedd, Ariana Grande
+Album: My Everything (Deluxe)
+Length: 3:34
+Listen Count: 2
+Total Listen Time: 7:09
+--------------------------------------------------------------------------------
+Song ID: 0wEC0GNF74lAqrEFZJMl1m
+Title: PUPPET
+Artist(s): Tyler, The Creator
+Album: IGOR
+Length: 2:59
+Listen Count: 2
+Total Listen Time: 5:58
+--------------------------------------------------------------------------------
+Song ID: 267WPtfCQlbwIPWWX3PJdd
+Title: Garden
+Artist(s): Frizzy P & Mr Cole
+Album: The Backroom Tape
+Length: 3:03
+Listen Count: 2
+Total Listen Time: 6:07
+--------------------------------------------------------------------------------
+Song ID: 55B1oLZNIH8M8lYyDdxG49
+Title: Stab My Back
+Artist(s): The All-American Rejects
+Album: Move Along
+Length: 3:09
+Listen Count: 2
+Total Listen Time: 6:18
+--------------------------------------------------------------------------------
+Song ID: 0vUTMiXT5ImCASXE8dGnEc
+Title: Minor Thing
+Artist(s): Red Hot Chili Peppers
+Album: By the Way
+Length: 3:37
+Listen Count: 2
+Total Listen Time: 7:14
+--------------------------------------------------------------------------------
+Song ID: 4zlRGOhDo36zoyPqNTYkYz
+Title: Light Sleeper
+Artist(s): EDEN
+Album: Dark
+Length: 4:05
+Listen Count: 2
+Total Listen Time: 8:10
+--------------------------------------------------------------------------------
+Song ID: 3SoDB59Y7dSZLSDBiNJ6o2
+Title: Charlie
+Artist(s): Red Hot Chili Peppers
+Album: Stadium Arcadium
+Length: 4:37
+Listen Count: 2
+Total Listen Time: 9:15
+--------------------------------------------------------------------------------
+Song ID: 5WAwle5RePFJtIdrl485kT
+Title: Silence
+Artist(s): Giant Rooks
+Album: ROOKERY
+Length: 2:45
+Listen Count: 2
+Total Listen Time: 5:30
+--------------------------------------------------------------------------------
+Song ID: 61Ph6Q4HYgWUVGulPszt9n
+Title: 5g
+Artist(s): brakence
+Album: hypochondriac
+Length: 3:29
+Listen Count: 1
+Total Listen Time: 3:29
+--------------------------------------------------------------------------------
+Song ID: 5dWUTX3wNkCpVT2ADvEJ7r
+Title: Needing / Getting
+Artist(s): OK Go
+Album: Of the Blue Colour of the Sky
+Length: 5:13
+Listen Count: 1
+Total Listen Time: 5:13
+--------------------------------------------------------------------------------
+Song ID: 6S3JlDAGk3uu3NtZbPnuhS
+Title: Baby Blue - Remastered 2010
+Artist(s): Badfinger
+Album: Straight Up (Remastered 2010 / Deluxe Edition)
+Length: 3:37
+Listen Count: 1
+Total Listen Time: 3:37
+--------------------------------------------------------------------------------
+Song ID: 2iS3P95EkgyRAHx2hLy0ga
+Title: deepfake
+Artist(s): brakence
+Album: hypochondriac
+Length: 5:30
+Listen Count: 1
+Total Listen Time: 5:30
+--------------------------------------------------------------------------------
+Song ID: 3TfTjLAddh9IIYYMbBCjL3
+Title: BATSHIT
+Artist(s): Lil Darkie
+Album: BATSHIT
+Length: 1:23
+Listen Count: 1
+Total Listen Time: 1:23
+--------------------------------------------------------------------------------
+Song ID: 2kvu82wvN644MUBBqkjKAg
+Title: My Love
+Artist(s): Solar Body
+Album: My Love
+Length: 2:13
+Listen Count: 1
+Total Listen Time: 2:13
+--------------------------------------------------------------------------------
+Song ID: 4yC9w1fGF879SbvZmA2cAp
+Title: Upside Down & Inside Out
+Artist(s): OK Go
+Album: Hungry Ghosts
+Length: 3:07
+Listen Count: 1
+Total Listen Time: 3:07
+--------------------------------------------------------------------------------
+Song ID: 1TyMq99cDIWt4ftjDuwDcR
+Title: The Question (feat. Lil Wayne)
+Artist(s): Mac Miller, Lil Wayne
+Album: Macadelic
+Length: 6:11
+Listen Count: 1
+Total Listen Time: 6:11
+--------------------------------------------------------------------------------
+Song ID: 49iNhnDmNnHYxPvEIVtPiN
+Title: Dreams from Yesterday
+Artist(s): Mac DeMarco
+Album: This Old Dog
+Length: 3:27
+Listen Count: 1
+Total Listen Time: 3:27
+--------------------------------------------------------------------------------
+Song ID: 4p3sIGdKAgRqrTvu3IpGnl
+Title: DEATH ROLL
+Artist(s): Doechii
+Album: Alligator Bites Never Heal
+Length: 2:19
+Listen Count: 1
+Total Listen Time: 2:19
+--------------------------------------------------------------------------------
+Song ID: 68rVGSTnCiFOET9k5Vd8Se
+Title: parents
+Artist(s): YUNGBLUD
+Album: the underrated youth
+Length: 2:51
+Listen Count: 1
+Total Listen Time: 2:51
+--------------------------------------------------------------------------------
+Song ID: 5tsI3xxDHDgzHhn30LTQNz
+Title: These Days
+Artist(s): mike.
+Album: This Isn't The Album
+Length: 4:28
+Listen Count: 1
+Total Listen Time: 4:28
+--------------------------------------------------------------------------------
+Song ID: 3vv9phIu6Y1vX3jcqaGz5Z
+Title: Roses
+Artist(s): The Chainsmokers, ROZES
+Album: Roses
+Length: 3:46
+Listen Count: 1
+Total Listen Time: 3:46
+--------------------------------------------------------------------------------
+Song ID: 0rFpcfF0YfvFUYsl99Bw9d
+Title: Soundtrack 2 My Life
+Artist(s): Kid Cudi
+Album: Man On The Moon: The End Of Day (Deluxe)
+Length: 3:55
+Listen Count: 1
+Total Listen Time: 3:55
+--------------------------------------------------------------------------------
+Song ID: 52QQCoot8ECkdnWl4xnSwR
+Title: Misinterpretations
+Artist(s): Giant Rooks
+Album: ROOKERY
+Length: 4:52
+Listen Count: 1
+Total Listen Time: 4:52
+--------------------------------------------------------------------------------
+Song ID: 1mMVC8AsuUUelwopm51Jht
+Title: STANKA POOH
+Artist(s): Doechii
+Album: Alligator Bites Never Heal
+Length: 2:01
+Listen Count: 1
+Total Listen Time: 2:01
+--------------------------------------------------------------------------------
+Song ID: 0GAyuCo975IHGxxiLKDufB
+Title: l e t . g o . m y . h a n d (with Bas & 6LACK)
+Artist(s): 6LACK, J. Cole, Bas
+Album: The Off-Season
+Length: 4:26
+Listen Count: 2
+Total Listen Time: 8:52
+--------------------------------------------------------------------------------
+Song ID: 0Fq5MtYDL9SSNKr2FstWxj
+Title: dead ends
+Artist(s): Jonah Zed, Gray Hawken
+Album: LOVEWONTWAIT
+Length: 3:03
+Listen Count: 1
+Total Listen Time: 3:03
+--------------------------------------------------------------------------------
+Song ID: 2puHJmjL4jvO19aEA7kzcb
+Title: Soulmate
+Artist(s): Mac Miller
+Album: The Divine Feminine
+Length: 4:32
+Listen Count: 1
+Total Listen Time: 4:32
+--------------------------------------------------------------------------------
+Song ID: 07VBqWH6NG8L2ad3l84UKk
+Title: R.I.P. 2 My Youth
+Artist(s): The Neighbourhood
+Album: Wiped Out!
+Length: 3:25
+Listen Count: 1
+Total Listen Time: 3:25
+--------------------------------------------------------------------------------
+Song ID: 4Zy41OO1JR7ubYW1LnJ3tA
+Title: Heat Up
+Artist(s): Giant Rooks
+Album: ROOKERY
+Length: 3:02
+Listen Count: 1
+Total Listen Time: 3:02
+--------------------------------------------------------------------------------
+Song ID: 3v6SdZsS8zR6Go257tldbB
+Title: SMUCKERS (feat. Lil Wayne & Kanye West)
+Artist(s): Tyler, The Creator, Lil Wayne, Kanye West
+Album: Cherry Bomb + Instrumentals
+Length: 5:34
+Listen Count: 1
+Total Listen Time: 5:34
+--------------------------------------------------------------------------------
+Song ID: 6U1ueRYXTjFHuJ9Ld2LBIW
+Title: Cut the Check (feat. Chief Keef)
+Artist(s): Chief Keef, Mac Miller
+Album: GO:OD AM
+Length: 2:50
+Listen Count: 1
+Total Listen Time: 2:50
+--------------------------------------------------------------------------------
+Song ID: 1MtUq6Wp1eQ8PC6BbPCj8P
+Title: I Took A Pill In Ibiza - Seeb Remix
+Artist(s): Mike Posner, Seeb
+Album: At Night, Alone.
+Length: 3:17
+Listen Count: 1
+Total Listen Time: 3:17
+--------------------------------------------------------------------------------
+Song ID: 0Ny860S38b9HbJma8CAr9N
+Title: WISH YOU WERE HERE (FAR AWAY)
+Artist(s): Red Leather
+Album: WISH YOU WERE HERE (FAR AWAY)
+Length: 3:35
+Listen Count: 1
+Total Listen Time: 3:35
+--------------------------------------------------------------------------------
+Song ID: 1WbhIxkn5ECsOwUm795iX1
+Title: Star Shopping
+Artist(s): Lil Peep
+Album: Star Shopping
+Length: 2:22
+Listen Count: 1
+Total Listen Time: 2:22
+--------------------------------------------------------------------------------
+Song ID: 1euszbbvkUzQzIhZUWFmXG
+Title: My Name Is Human
+Artist(s): Highly Suspect
+Album: The Boy Who Died Wolf
+Length: 4:18
+Listen Count: 1
+Total Listen Time: 4:18
+--------------------------------------------------------------------------------
+Song ID: 5O59s7bCgTFsXDXlWecyQ1
+Title: Apparently
+Artist(s): J. Cole
+Album: 2014 Forest Hills Drive
+Length: 4:52
+Listen Count: 1
+Total Listen Time: 4:52
+--------------------------------------------------------------------------------
+Song ID: 78LMazmfqncADjyJVae8dN
+Title: Anything You Want
+Artist(s): JAWNY
+Album: Anything You Want
+Length: 2:03
+Listen Count: 1
+Total Listen Time: 2:03
+--------------------------------------------------------------------------------
+Song ID: 6oZ7mlsLFks8E9GLh9Pkwt
+Title: Mushroom Clouds
+Artist(s): Like
+Album: Songs Made While High
+Length: 2:31
+Listen Count: 1
+Total Listen Time: 2:31
+--------------------------------------------------------------------------------
+Song ID: 4cQrSREMqBSvJ8ZzBZjVb8
+Title: Mile High (feat. Travis Scott & Metro Boomin)
+Artist(s): Metro Boomin, Travis Scott, James Blake
+Album: Assume Form
+Length: 3:13
+Listen Count: 1
+Total Listen Time: 3:13
+--------------------------------------------------------------------------------
+Song ID: 6vnfObZ4Ys70SBAtti1xZ9
+Title: COFFEE BEAN
+Artist(s): Travis Scott
+Album: ASTROWORLD
+Length: 3:29
+Listen Count: 1
+Total Listen Time: 3:29
+--------------------------------------------------------------------------------
+Song ID: 6sdZ1JIc4rI6vl8brvzr2s
+Title: Arms
+Artist(s): Jon Wiilde
+Album: Arms
+Length: 3:51
+Listen Count: 1
+Total Listen Time: 3:51
+--------------------------------------------------------------------------------
+Song ID: 2cjpm3YodZ8877wanjREeH
+Title: Intro (Santa Barbara)
+Artist(s): Box Dreams
+Album: Boxdreams
+Length: 4:14
+Listen Count: 1
+Total Listen Time: 4:14
+--------------------------------------------------------------------------------
+Song ID: 1aYeBUofVM4l9Pc1XGwz5q
+Title: Acid Rain
+Artist(s): Chance the Rapper
+Album: Acid Rap
+Length: 3:36
+Listen Count: 1
+Total Listen Time: 3:36
+--------------------------------------------------------------------------------
+Song ID: 0sj2jVLjaomVaFAJZqSZI9
+Title: Be Somebody (feat. A$AP Rocky & Lil B)
+Artist(s): A$AP Rocky, Lil B, Clams Casino
+Album: 32 Levels (Deluxe)
+Length: 3:32
+Listen Count: 1
+Total Listen Time: 3:32
+--------------------------------------------------------------------------------
+Song ID: 0Ubp7kMZ6MWZIL8qkloYub
+Title: Warmpop
+Artist(s): George Clanton, ESPRIT 空想
+Album: 200% Electronica
+Length: 2:52
+Listen Count: 1
+Total Listen Time: 2:52
+--------------------------------------------------------------------------------
+Song ID: 07mdQUH1Cy5j4mTpyG6IOe
+Title: Let Go
+Artist(s): Ark Patrol, Veronika Redd
+Album: Let Go
+Length: 4:08
+Listen Count: 1
+Total Listen Time: 4:08
+--------------------------------------------------------------------------------
+Song ID: 5I4ipBNoOOXF20YY0pOjCx
+Title: A Spike Lee Joint (feat. Anthony Flammia)
+Artist(s): Flatbush Zombies, Anthony Flammia
+Album: 3001: A Laced Odyssey
+Length: 4:15
+Listen Count: 1
+Total Listen Time: 4:15
+--------------------------------------------------------------------------------
+
+
+ARTIST STATISTICS
+--------------------------------------------------------------------------------
+
+Artist ID: 0L8ExT028jH3ddEcZwqJJ5
+Artist Name: Red Hot Chili Peppers
+Total Listens: 6
+Total Listen Time: 22:55
+--------------------------------------------------------------------------------
+Artist ID: 5wD0owYApRtYmjPWavWKvb
+Artist Name: Giant Rooks
+Total Listens: 4
+Total Listen Time: 13:25
+--------------------------------------------------------------------------------
+Artist ID: 4LLpKhyESsyAXpc4laK94U
+Artist Name: Mac Miller
+Total Listens: 3
+Total Listen Time: 13:35
+--------------------------------------------------------------------------------
+Artist ID: 4V8LLVI7PbaPR0K2TGSxFF
+Artist Name: Tyler, The Creator
+Total Listens: 3
+Total Listen Time: 11:32
+--------------------------------------------------------------------------------
+Artist ID: 6l3HvQ5sa6mXTsMTB19rO5
+Artist Name: J. Cole
+Total Listens: 3
+Total Listen Time: 13:45
+--------------------------------------------------------------------------------
+Artist ID: 1t20wYnTiAT0Bs7H1hv9Wt
+Artist Name: EDEN
+Total Listens: 2
+Total Listen Time: 8:10
+--------------------------------------------------------------------------------
+Artist ID: 3vAaWhdBR38Q02ohXqaNHT
+Artist Name: The All-American Rejects
+Total Listens: 2
+Total Listen Time: 6:18
+--------------------------------------------------------------------------------
+Artist ID: 0wI3LzADu9herA70Ln81OU
+Artist Name: Frizzy P & Mr Cole
+Total Listens: 2
+Total Listen Time: 6:07
+--------------------------------------------------------------------------------
+Artist ID: 0Y5tJX1MQlPlqiwlOH1tJY
+Artist Name: Travis Scott
+Total Listens: 2
+Total Listen Time: 6:42
+--------------------------------------------------------------------------------
+Artist ID: 2qxJFvFYMEDqd7ui6kSAcq
+Artist Name: Zedd
+Total Listens: 2
+Total Listen Time: 7:09
+--------------------------------------------------------------------------------
+Artist ID: 7qrEXiLLnWkkYHhadZ1Oij
+Artist Name: Blondshell
+Total Listens: 2
+Total Listen Time: 8:04
+--------------------------------------------------------------------------------
+Artist ID: 4E2rKHVDssGJm2SCDOMMJB
+Artist Name: Doechii
+Total Listens: 2
+Total Listen Time: 4:20
+--------------------------------------------------------------------------------
+Artist ID: 3hozsZ9hqNq7CoBGYNlFTz
+Artist Name: OK Go
+Total Listens: 2
+Total Listen Time: 8:21
+--------------------------------------------------------------------------------
+Artist ID: 4IVAbR2w4JJNJDDRFP3E83
+Artist Name: 6LACK
+Total Listens: 2
+Total Listen Time: 8:52
+--------------------------------------------------------------------------------
+Artist ID: 4kqFrZkeqDfOIEqTWqbOOV
+Artist Name: brakence
+Total Listens: 2
+Total Listen Time: 9:00
+--------------------------------------------------------------------------------
+Artist ID: 55Aa2cqylxrFIXC767Z865
+Artist Name: Lil Wayne
+Total Listens: 2
+Total Listen Time: 11:46
+--------------------------------------------------------------------------------
+Artist ID: 66CXWjxzNUsdJxJ2JdwvnR
+Artist Name: Ariana Grande
+Total Listens: 2
+Total Listen Time: 7:09
+--------------------------------------------------------------------------------
+Artist ID: 70gP6Ry4Uo0Yx6uzPIdaiJ
+Artist Name: Bas
+Total Listens: 2
+Total Listen Time: 8:52
+--------------------------------------------------------------------------------
+Artist ID: 2kCcBybjl3SAtIcwdWpUe3
+Artist Name: Lil Peep
+Total Listens: 1
+Total Listen Time: 2:22
+--------------------------------------------------------------------------------
+Artist ID: 2KsP6tYLJlTBvSUxnwlVWa
+Artist Name: Mike Posner
+Total Listens: 1
+Total Listen Time: 3:17
+--------------------------------------------------------------------------------
+Artist ID: 2pqd3HsfsvcBGtHvPOg6eg
+Artist Name: Highly Suspect
+Total Listens: 1
+Total Listen Time: 4:18
+--------------------------------------------------------------------------------
+Artist ID: 2qltFRTCjw1j67Da9FR8F1
+Artist Name: Red Leather
+Total Listens: 1
+Total Listen Time: 3:35
+--------------------------------------------------------------------------------
+Artist ID: 3bqHSYVBMI0gs3v86080ZT
+Artist Name: Jon Wiilde
+Total Listens: 1
+Total Listen Time: 3:51
+--------------------------------------------------------------------------------
+Artist ID: 3zaxUd86U92CdZkNa6NUo9
+Artist Name: Ark Patrol
+Total Listens: 1
+Total Listen Time: 4:08
+--------------------------------------------------------------------------------
+Artist ID: 4Aq0I7zm89FSHuqvvh63rw
+Artist Name: Anthony Flammia
+Total Listens: 1
+Total Listen Time: 4:15
+--------------------------------------------------------------------------------
+Artist ID: 4bbjivSh1oG4NOc7uYHfw5
+Artist Name: Lil B
+Total Listens: 1
+Total Listen Time: 3:32
+--------------------------------------------------------------------------------
+Artist ID: 15iVAtD3s3FsQR4w1v6M0P
+Artist Name: Chief Keef
+Total Listens: 1
+Total Listen Time: 2:50
+--------------------------------------------------------------------------------
+Artist ID: 0fA0VVWsXO9YnASrzqfmYu
+Artist Name: Kid Cudi
+Total Listens: 1
+Total Listen Time: 3:55
+--------------------------------------------------------------------------------
+Artist ID: 0iEtIxbK0KxaSlF7G42ZOp
+Artist Name: Metro Boomin
+Total Listens: 1
+Total Listen Time: 3:13
+--------------------------------------------------------------------------------
+Artist ID: 4mPkv3XVHp9mMeSXp5Ix3D
+Artist Name: Jonah Zed
+Total Listens: 1
+Total Listen Time: 3:03
+--------------------------------------------------------------------------------
+Artist ID: 4pJCawaKSZ40EnxN0YEYw3
+Artist Name: Badfinger
+Total Listens: 1
+Total Listen Time: 3:37
+--------------------------------------------------------------------------------
+Artist ID: 13ubrt8QOOCPljQ2FL1Kca
+Artist Name: A$AP Rocky
+Total Listens: 1
+Total Listen Time: 3:32
+--------------------------------------------------------------------------------
+Artist ID: 53KwLdlmrlCelAZMaLVZqU
+Artist Name: James Blake
+Total Listens: 1
+Total Listen Time: 3:13
+--------------------------------------------------------------------------------
+Artist ID: 1anyVhU62p31KFi8MEzkbf
+Artist Name: Chance the Rapper
+Total Listens: 1
+Total Listen Time: 3:36
+--------------------------------------------------------------------------------
+Artist ID: 5G9kmDLg3OeUyj8KVBLzbu
+Artist Name: mike.
+Total Listens: 1
+Total Listen Time: 4:28
+--------------------------------------------------------------------------------
+Artist ID: 5iNrZmtVMtYev5M9yoWpEq
+Artist Name: Seeb
+Total Listens: 1
+Total Listen Time: 3:17
+--------------------------------------------------------------------------------
+Artist ID: 5K4W6rqBFWDnAN6FQUkS6x
+Artist Name: Kanye West
+Total Listens: 1
+Total Listen Time: 5:34
+--------------------------------------------------------------------------------
+Artist ID: 5vSQUyT33qxr1xAX2Tkf3A
+Artist Name: Clams Casino
+Total Listens: 1
+Total Listen Time: 3:32
+--------------------------------------------------------------------------------
+Artist ID: 1dqGS5sT6PE2wEvP1gROZC
+Artist Name: Flatbush Zombies
+Total Listens: 1
+Total Listen Time: 4:15
+--------------------------------------------------------------------------------
+Artist ID: 62F9BiUmjqeXbBztCwiX1U
+Artist Name: Lil Darkie
+Total Listens: 1
+Total Listen Time: 1:23
+--------------------------------------------------------------------------------
+Artist ID: 1G5v3lpMz7TeoW0yGpRQHr
+Artist Name: George Clanton
+Total Listens: 1
+Total Listen Time: 2:52
+--------------------------------------------------------------------------------
+Artist ID: 69GGBxA162lTqCwzJG5jLp
+Artist Name: The Chainsmokers
+Total Listens: 1
+Total Listen Time: 3:46
+--------------------------------------------------------------------------------
+Artist ID: 6Ad91Jof8Niiw0lGLLi3NW
+Artist Name: YUNGBLUD
+Total Listens: 1
+Total Listen Time: 2:51
+--------------------------------------------------------------------------------
+Artist ID: 6eDKMXn3OBIkI8jcY7JtlI
+Artist Name: ESPRIT 空想
+Total Listens: 1
+Total Listen Time: 2:52
+--------------------------------------------------------------------------------
+Artist ID: 6imRNjLGoofHTQtBEk0ooM
+Artist Name: Box Dreams
+Total Listens: 1
+Total Listen Time: 4:14
+--------------------------------------------------------------------------------
+Artist ID: 6jsjhAEteAlY0vCiLvMLBA
+Artist Name: ROZES
+Total Listens: 1
+Total Listen Time: 3:46
+--------------------------------------------------------------------------------
+Artist ID: 3Sz7ZnJQBIHsXLUSo0OQtM
+Artist Name: Mac DeMarco
+Total Listens: 1
+Total Listen Time: 3:27
+--------------------------------------------------------------------------------
+Artist ID: 25pd339V2rRJo84USlcSRP
+Artist Name: JAWNY
+Total Listens: 1
+Total Listen Time: 2:03
+--------------------------------------------------------------------------------
+Artist ID: 2J2V1PxHVZ1ANtT8Y2UdTS
+Artist Name: Like
+Total Listens: 1
+Total Listen Time: 2:31
+--------------------------------------------------------------------------------
+Artist ID: 74xLamiAg7I4qmr2XsOddO
+Artist Name: Solar Body
+Total Listens: 1
+Total Listen Time: 2:13
+--------------------------------------------------------------------------------
+Artist ID: 77SW9BnxLY8rJ0RciFqkHh
+Artist Name: The Neighbourhood
+Total Listens: 1
+Total Listen Time: 3:25
+--------------------------------------------------------------------------------
+Artist ID: 7h7Pygo9LpZ14cEPuTSQjl
+Artist Name: Gray Hawken
+Total Listens: 1
+Total Listen Time: 3:03
+--------------------------------------------------------------------------------
+Artist ID: 6kuFWCCvd7bWB1PV0tJMN2
+Artist Name: Veronika Redd
+Total Listens: 1
+Total Listen Time: 4:08
+--------------------------------------------------------------------------------
+
+
+ALBUM STATISTICS
+--------------------------------------------------------------------------------
+
+Album ID: 03kOqFjrxiwkgvj2ExN6ii
+Album Title: Move Along
+Album Listen Time: 6:18
+Album Listens: 0
+Album Length: 45:51
+--------------------------------------------------------------------------------
+Album ID: 0BWOueFZKxQrQWNRt20Lvc
+Album Title: Straight Up (Remastered 2010 / Deluxe Edition)
+Album Listen Time: 3:37
+Album Listens: 0
+Album Length: 61:48
+--------------------------------------------------------------------------------
+Album ID: 0heGEO3au4OmkR8Oor96qu
+Album Title: Anything You Want
+Album Listen Time: 2:03
+Album Listens: 0
+Album Length: 2:03
+--------------------------------------------------------------------------------
+Album ID: 0kGTcfwQC5nlsubgxUXdwP
+Album Title: the underrated youth
+Album Listen Time: 2:51
+Album Listens: 0
+Album Length: 18:42
+--------------------------------------------------------------------------------
+Album ID: 0LuXfUzTQhhaVZ5E1G3xUX
+Album Title: My Love
+Album Listen Time: 2:13
+Album Listens: 0
+Album Length: 33:40
+--------------------------------------------------------------------------------
+Album ID: 0MC64GVRKxMHJpwqxHtFfh
+Album Title: WISH YOU WERE HERE (FAR AWAY)
+Album Listen Time: 3:35
+Album Listens: 0
+Album Length: 3:35
+--------------------------------------------------------------------------------
+Album ID: 0RSPVYjnhUDpXfMOa7zTdE
+Album Title: Blondshell
+Album Listen Time: 8:04
+Album Listens: 0
+Album Length: 32:47
+--------------------------------------------------------------------------------
+Album ID: 0UMMIkurRUmkruZ3KGBLtG
+Album Title: 2014 Forest Hills Drive
+Album Listen Time: 4:52
+Album Listens: 0
+Album Length: 64:43
+--------------------------------------------------------------------------------
+Album ID: 18iFxjZugvKhuNNMbLjZJF
+Album Title: Wiped Out!
+Album Listen Time: 3:25
+Album Listens: 0
+Album Length: 45:22
+--------------------------------------------------------------------------------
+Album ID: 1jWKVgnHX8nwR551hQNx5K
+Album Title: By the Way
+Album Listen Time: 13:40
+Album Listens: 0
+Album Length: 68:37
+--------------------------------------------------------------------------------
+Album ID: 1Tz3Ai1guEFf4hV3d9i17K
+Album Title: At Night, Alone.
+Album Listen Time: 3:17
+Album Listens: 0
+Album Length: 58:16
+--------------------------------------------------------------------------------
+Album ID: 23dKNZpiadggKHrQgHLi3L
+Album Title: Assume Form
+Album Listen Time: 3:13
+Album Listens: 0
+Album Length: 48:12
+--------------------------------------------------------------------------------
+Album ID: 28WPMClVfDtMHaNrrjbPcX
+Album Title: ROOKERY
+Album Listen Time: 13:25
+Album Listens: 0
+Album Length: 49:09
+--------------------------------------------------------------------------------
+Album ID: 2GFflENKz28RcMoSuulPZC
+Album Title: Roses
+Album Listen Time: 3:46
+Album Listens: 0
+Album Length: 3:46
+--------------------------------------------------------------------------------
+Album ID: 2jyHYK0byP7L61nlSJf4Wn
+Album Title: Let Go
+Album Listen Time: 4:08
+Album Listens: 0
+Album Length: 4:08
+--------------------------------------------------------------------------------
+Album ID: 2S8AWAM0nxyFy66YnUfIs3
+Album Title: Man On The Moon: The End Of Day (Deluxe)
+Album Listen Time: 3:55
+Album Listens: 0
+Album Length: 68:08
+--------------------------------------------------------------------------------
+Album ID: 2Tyx5dLhHYkx6zeAdVaTzN
+Album Title: GO:OD AM
+Album Listen Time: 2:50
+Album Listens: 0
+Album Length: 70:33
+--------------------------------------------------------------------------------
+Album ID: 32aiM2fFDyOQkXX7Sc82AF
+Album Title: The Backroom Tape
+Album Listen Time: 6:07
+Album Listens: 0
+Album Length: 15:56
+--------------------------------------------------------------------------------
+Album ID: 342nD5SIsD90lP8LxkLaLM
+Album Title: Star Shopping
+Album Listen Time: 2:22
+Album Listens: 0
+Album Length: 2:22
+--------------------------------------------------------------------------------
+Album ID: 3TC40H9dIJArFzy0rWnWCg
+Album Title: The Boy Who Died Wolf
+Album Listen Time: 4:18
+Album Listens: 0
+Album Length: 45:11
+--------------------------------------------------------------------------------
+Album ID: 41GuZcammIkupMPKH2OJ6I
+Album Title: ASTROWORLD
+Album Listen Time: 3:29
+Album Listens: 0
+Album Length: 58:42
+--------------------------------------------------------------------------------
+Album ID: 41VPP2i2Yrwe8bXs5NNpM9
+Album Title: Of the Blue Colour of the Sky
+Album Listen Time: 5:13
+Album Listens: 0
+Album Length: 51:18
+--------------------------------------------------------------------------------
+Album ID: 4JAvwK4APPArjIsOdGoJXX
+Album Title: The Off-Season
+Album Listen Time: 8:52
+Album Listens: 0
+Album Length: 39:08
+--------------------------------------------------------------------------------
+Album ID: 4NNq2vwTapv4fSJcrZbPH7
+Album Title: This Old Dog
+Album Listen Time: 3:27
+Album Listens: 0
+Album Length: 42:28
+--------------------------------------------------------------------------------
+Album ID: 4Qohh8LwXoV7ucmjCU4MYL
+Album Title: 3001: A Laced Odyssey
+Album Listen Time: 4:15
+Album Listens: 0
+Album Length: 60:55
+--------------------------------------------------------------------------------
+Album ID: 4t4KbyqvuvVCuOhtIaLbIx
+Album Title: Boxdreams
+Album Listen Time: 4:14
+Album Listens: 0
+Album Length: 37:40
+--------------------------------------------------------------------------------
+Album ID: 4V3LVm1CTUGDpkWrKJiyJo
+Album Title: Dark
+Album Listen Time: 8:10
+Album Listens: 0
+Album Length: 40:02
+--------------------------------------------------------------------------------
+Album ID: 5ucBp2aUeP4yNdZ8WnwRyL
+Album Title: BATSHIT
+Album Listen Time: 1:23
+Album Listens: 0
+Album Length: 1:23
+--------------------------------------------------------------------------------
+Album ID: 5V3Chnpno9oTI7JSPXKUf3
+Album Title: Cherry Bomb + Instrumentals
+Album Listen Time: 5:34
+Album Listens: 0
+Album Length: 109:45
+--------------------------------------------------------------------------------
+Album ID: 5xlGDgCReuVXePNmc7EjbH
+Album Title: Songs Made While High
+Album Listen Time: 2:31
+Album Listens: 0
+Album Length: 42:30
+--------------------------------------------------------------------------------
+Album ID: 5zi7WsKlIiUXv09tbGLKsE
+Album Title: IGOR
+Album Listen Time: 5:58
+Album Listens: 0
+Album Length: 39:46
+--------------------------------------------------------------------------------
+Album ID: 60UzB8mOCMpc7xkuJE6Bwc
+Album Title: Alligator Bites Never Heal
+Album Listen Time: 4:20
+Album Listens: 0
+Album Length: 47:03
+--------------------------------------------------------------------------------
+Album ID: 64ISz2igeTrshkL99RcEL2
+Album Title: LOVEWONTWAIT
+Album Listen Time: 3:03
+Album Listens: 0
+Album Length: 27:26
+--------------------------------------------------------------------------------
+Album ID: 6EVYTRG1drKdO8OnIQBeEj
+Album Title: My Everything (Deluxe)
+Album Listen Time: 7:09
+Album Listens: 0
+Album Length: 50:58
+--------------------------------------------------------------------------------
+Album ID: 6f6tko6NWoH00cyFOl4VYQ
+Album Title: The Divine Feminine
+Album Listen Time: 4:32
+Album Listens: 0
+Album Length: 52:37
+--------------------------------------------------------------------------------
+Album ID: 6HiGOyRSF5SiFh5Yv5mEu5
+Album Title: This Isn't The Album
+Album Listen Time: 4:28
+Album Listens: 0
+Album Length: 28:16
+--------------------------------------------------------------------------------
+Album ID: 6IaJIG1vHwTmbRxxENETey
+Album Title: Macadelic
+Album Listen Time: 6:11
+Album Listens: 0
+Album Length: 64:45
+--------------------------------------------------------------------------------
+Album ID: 6OEqHmIjxByhkQjjxuIBBL
+Album Title: Hungry Ghosts
+Album Listen Time: 3:07
+Album Listens: 0
+Album Length: 41:57
+--------------------------------------------------------------------------------
+Album ID: 6WgSCcRfaXuBVfM2TpV0Kl
+Album Title: 200% Electronica
+Album Listen Time: 2:52
+Album Listens: 0
+Album Length: 38:08
+--------------------------------------------------------------------------------
+Album ID: 6XV76W17coHAKFdeyiGT08
+Album Title: hypochondriac
+Album Listen Time: 9:00
+Album Listens: 0
+Album Length: 52:12
+--------------------------------------------------------------------------------
+Album ID: 72Dq2dyB7iYmRF2FHLFPMh
+Album Title: Arms
+Album Listen Time: 3:51
+Album Listens: 0
+Album Length: 3:51
+--------------------------------------------------------------------------------
+Album ID: 7Amrg2WughWQXMEmUfjhl3
+Album Title: 32 Levels (Deluxe)
+Album Listen Time: 3:32
+Album Listens: 0
+Album Length: 73:53
+--------------------------------------------------------------------------------
+Album ID: 7Ffm3ZluTZRYEdlE5Jjlid
+Album Title: Acid Rap
+Album Listen Time: 3:36
+Album Listens: 0
+Album Length: 50:21
+--------------------------------------------------------------------------------
+Album ID: 7xl50xr9NDkd3i2kBbzsNZ
+Album Title: Stadium Arcadium
+Album Listen Time: 9:15
+Album Listens: 0
+Album Length: 151:43
+--------------------------------------------------------------------------------

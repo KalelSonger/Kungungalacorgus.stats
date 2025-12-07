@@ -195,7 +195,7 @@ def link_album_song(album_id, song_id):
 
 def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms, song_length_ms):
     """Insert a new album or update existing album's stats
-    Note: A_Listens will be calculated separately as MIN(song listens) for complete album plays"""
+    Note: A_Listens will be calculated as MIN(song listens) only if ALL tracks have been listened to"""
     connection = get_db_connection()
     if not connection:
         return False
@@ -203,35 +203,39 @@ def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms,
     try:
         cursor = connection.cursor()
         
+        # Add total_tracks column if it doesn't exist
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = 'spotifyDatabase' 
+            AND TABLE_NAME = 'Albums' 
+            AND COLUMN_NAME = 'total_tracks'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("ALTER TABLE Albums ADD COLUMN total_tracks INT DEFAULT NULL")
+            connection.commit()
+            print("✓ Added total_tracks column to Albums table")
+        
         # Check if album exists
-        cursor.execute("SELECT A_Listen_Time FROM Albums WHERE A_ID = %s", (album_id,))
+        cursor.execute("SELECT A_Listen_Time, total_tracks FROM Albums WHERE A_ID = %s", (album_id,))
         result = cursor.fetchone()
         
         if result:
-            # Update existing album - only update listen time, listens will be calculated separately
+            # Update existing album
             new_listen_time = result[0] + song_length_ms
+            stored_total_tracks = result[1] if result[1] else total_tracks
             
             # Calculate complete album listens:
-            # First check if user has ALL songs from the album in database
-            # If not, album listens = 0 (haven't completed the album)
-            # If yes, album listens = MIN(song listens) across all album songs
+            # Check if user has listened to ALL tracks in the album
+            cursor.execute("""
+                SELECT COUNT(DISTINCT s.S_ID) as songs_in_db
+                FROM Songs s
+                JOIN Album_Song als ON s.S_ID = als.S_ID
+                WHERE als.A_ID = %s AND s.flag = 1
+            """, (album_id,))
+            songs_in_db = cursor.fetchone()[0]
             
-            # Get total tracks in the actual album (from A_Length which stores total tracks)
-            cursor.execute("SELECT A_Length FROM Albums WHERE A_ID = %s", (album_id,))
-            album_info = cursor.fetchone()
-            
-            if album_info:
-                # Count how many songs from this album are in the database
-                cursor.execute("""
-                    SELECT COUNT(DISTINCT s.S_ID) as song_count
-                    FROM Songs s
-                    JOIN Album_Song als ON s.S_ID = als.S_ID
-                    WHERE als.A_ID = %s AND s.flag = 1
-                """, (album_id,))
-                db_song_count = cursor.fetchone()[0]
-                
-                # Note: We can't know total album tracks without fetching from API
-                # So we'll just use MIN of songs we have, and if any song has 0 listens, album = 0
+            # If user has ALL tracks from album AND all have listens > 0, get MIN
+            if songs_in_db >= stored_total_tracks:
                 cursor.execute("""
                     SELECT MIN(s.S_Listens) as min_listens
                     FROM Songs s
@@ -239,22 +243,23 @@ def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms,
                     WHERE als.A_ID = %s AND s.flag = 1
                 """, (album_id,))
                 min_result = cursor.fetchone()
-                # If ANY song has 0 listens (or no songs), complete_listens = 0
+                # If MIN is 0, that means at least one song hasn't been played
                 complete_listens = min_result[0] if min_result and min_result[0] and min_result[0] > 0 else 0
             else:
+                # User hasn't listened to all tracks yet
                 complete_listens = 0
             
             cursor.execute("""
                 UPDATE Albums 
-                SET A_Listen_Time = %s, A_Listens = %s, flag = 1
+                SET A_Listen_Time = %s, A_Listens = %s, total_tracks = %s, flag = 1
                 WHERE A_ID = %s
-            """, (new_listen_time, complete_listens, album_id))
+            """, (new_listen_time, complete_listens, stored_total_tracks, album_id))
         else:
-            # Insert new album with 0 listens initially (will be calculated after songs are linked)
+            # Insert new album with 0 listens initially
             cursor.execute("""
-                INSERT INTO Albums (A_ID, A_Title, A_Listen_Time, A_Listens, A_Length, flag)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (album_id, album_title[:50], song_length_ms, 0, album_length_ms, 1))
+                INSERT INTO Albums (A_ID, A_Title, A_Listen_Time, A_Listens, A_Length, total_tracks, flag)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (album_id, album_title[:50], song_length_ms, 0, album_length_ms, total_tracks, 1))
         
         connection.commit()
         cursor.close()
