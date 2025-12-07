@@ -195,15 +195,46 @@ def database_values():
     }
     
     # Fetch user profile
-    profile_response = requests.get(API_BASE_URL + '/me', headers=headers)
-    user_profile = profile_response.json()
-    user_id = user_profile.get('id', 'N/A')
-    user_username = user_profile.get('display_name', 'N/A')
+    try:
+        profile_response = requests.get(API_BASE_URL + '/me', headers=headers)
+        profile_response.raise_for_status()  # Raise exception for bad status codes
+        user_profile = profile_response.json()
+        user_id = user_profile.get('id', 'N/A')
+        user_username = user_profile.get('display_name', 'N/A')
+    except requests.exceptions.RequestException as e:
+        return f"""
+        <h1>Error Fetching User Profile</h1>
+        <p>Status Code: {profile_response.status_code}</p>
+        <p>Response: {profile_response.text}</p>
+        <p>Error: {str(e)}</p>
+        <p><a href='/login'>Try logging in again</a></p>
+        """
+    except ValueError as e:
+        return f"""
+        <h1>Error Parsing User Profile Response</h1>
+        <p>The API response was not valid JSON.</p>
+        <p>Response: {profile_response.text}</p>
+        <p>Error: {str(e)}</p>
+        <p><a href='/login'>Try logging in again</a></p>
+        """
     
     # Fetch all playlists
     all_playlists = []
-    playlists_response = requests.get(API_BASE_URL + '/me/playlists?limit=50', headers=headers)
-    playlists = playlists_response.json()
+    try:
+        playlists_response = requests.get(API_BASE_URL + '/me/playlists?limit=50', headers=headers)
+        playlists_response.raise_for_status()
+        playlists = playlists_response.json()
+    except requests.exceptions.RequestException as e:
+        playlists = {'items': []}
+        return f"""
+        <h1>Error Fetching Playlists</h1>
+        <p>Status Code: {playlists_response.status_code}</p>
+        <p>Response: {playlists_response.text}</p>
+        <p>Error: {str(e)}</p>
+        <p><a href='/login'>Try logging in again</a></p>
+        """
+    except ValueError as e:
+        playlists = {'items': []}
     if 'items' in playlists:
         for playlist in playlists['items']:
             all_playlists.append({
@@ -212,8 +243,26 @@ def database_values():
             })
     
     # Fetch 25 most recent songs
-    recent_response = requests.get(API_BASE_URL + '/me/player/recently-played?limit=25', headers=headers)
-    recent = recent_response.json()
+    try:
+        recent_response = requests.get(API_BASE_URL + '/me/player/recently-played?limit=25', headers=headers)
+        recent_response.raise_for_status()
+        recent = recent_response.json()
+    except requests.exceptions.RequestException as e:
+        return f"""
+        <h1>Error Fetching Recent Songs</h1>
+        <p>Status Code: {recent_response.status_code}</p>
+        <p>Response: {recent_response.text}</p>
+        <p>Error: {str(e)}</p>
+        <p><a href='/login'>Try logging in again</a></p>
+        """
+    except ValueError as e:
+        return f"""
+        <h1>Error Parsing Recent Songs Response</h1>
+        <p>The API response was not valid JSON.</p>
+        <p>Response: {recent_response.text}</p>
+        <p>Error: {str(e)}</p>
+        <p><a href='/login'>Try logging in again</a></p>
+        """
     
     # Dictionary to track song stats: {song_id: {title, length_ms, listen_count, artists, album}}
     song_stats = {}
