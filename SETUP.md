@@ -8,14 +8,52 @@
 ## Installation
 
 ### 1. Install Python Dependencies
+
+**Windows/MacOS:**
 ```bash
 pip install -r requirements.txt
 ```
 
+**Linux:**
+```bash
+pip3 install -r requirements.txt
+```
+
 ### 2. Install and Configure ngrok
 
+#### Windows
 **Install ngrok:**
-- Download from https://ngrok.com/download or use a package manager
+- Download from https://ngrok.com/download
+- Or use: `winget install ngrok`
+
+**Configure ngrok with the authtoken:**
+```powershell
+ngrok config add-authtoken 2vxIYJpjk30G6C6CWl6NKRT8aZx_6ZubgvFvfvquPBLbohmwz
+```
+
+#### MacOS
+**Install ngrok:**
+```bash
+brew install ngrok
+```
+
+**Configure ngrok with the authtoken:**
+```bash
+ngrok config add-authtoken 2vxIYJpjk30G6C6CWl6NKRT8aZx_6ZubgvFvfvquPBLbohmwz
+```
+
+#### Linux
+**Install ngrok:**
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install ngrok
+
+# Or download from https://ngrok.com/download
+# Extract and move to PATH
+tar xvzf ngrok-v3-stable-linux-amd64.tgz
+sudo mv ngrok /usr/local/bin/ngrok
+```
 
 **Configure ngrok with the authtoken:**
 ```bash
@@ -26,23 +64,29 @@ This must be done once per machine. This allows the app to use the reserved ngro
 
 ### 3. Run the App
 
-```bash
+**Windows:**
+```powershell
 python main.py
+```
+
+**MacOS/Linux:**
+```bash
+python3 main.py
 ```
 
 The app will:
 - Automatically start ngrok tunnel on `https://easily-crankier-coleman.ngrok-free.dev`
-- Start the Flask server on `http://localhost:5000`
+- Start the Flask server on `http://0.0.0.0:5000` (accessible from any machine)
 - Print "✓ ngrok tunnel started successfully" when ready
 
 ### 4. Access the App
 
-Visit in your browser:
+From any computer (local or remote), visit in your browser:
 ```
 https://easily-crankier-coleman.ngrok-free.dev
 ```
 
-Click "Login with Spotify" to authenticate and view your 50 most recently played songs.
+Click "Login with Spotify" to authenticate and view your Spotify statistics.
 
 ## Spotify Credentials
 
@@ -53,11 +97,19 @@ The app uses the following Spotify API credentials (already configured in the co
 
 These are pre-registered and no additional Spotify setup is needed.
 
+## Important Notes
+
+- **Each user needs their own Spotify account** - When logging in via the app, you authenticate with your personal Spotify account
+- **The ngrok domain is shared** - All users accessing the app will go through the same ngrok tunnel to the same server
+- **Sessions are isolated** - Each browser/user maintains their own session with their own Spotify data
+- **The authtoken is the same for all machines** - Use the authtoken provided above on every machine that runs this app
+
 ## Troubleshooting
 
 **"No web processes running" or connection refused:**
-- Make sure `python main.py` is still running
+- Make sure `python main.py` (or `python3 main.py` on Linux/Mac) is still running
 - Check that ngrok started successfully (look for the "✓" message)
+- Verify the ngrok domain is accessible: visit https://easily-crankier-coleman.ngrok-free.dev
 
 **ngrok says "authentication failed":**
 - Run: `ngrok config add-authtoken 2vxIYJpjk30G6C6CWl6NKRT8aZx_6ZubgvFvfvquPBLbohmwz`
@@ -66,3 +118,16 @@ These are pre-registered and no additional Spotify setup is needed.
 **Spotify redirect URI error:**
 - The redirect URI should match exactly: `https://easily-crankier-coleman.ngrok-free.dev/callback`
 - Check Spotify Developer Dashboard > Your App > Redirect URIs
+- Do not include trailing slashes
+
+**Module not found errors (ImportError):**
+- Make sure you ran `pip install -r requirements.txt` (or `pip3` on Linux/Mac)
+- Try upgrading pip: `pip install --upgrade pip`
+
+**Port 5000 already in use:**
+- Close any other Flask applications running on port 5000
+- Or modify the port in `main.py` at the bottom (change `app.run(host='0.0.0.0', debug=True)`)
+
+**Permission denied when running ngrok on Linux:**
+- Make sure ngrok is in your PATH: `which ngrok`
+- Or run with full path: `/usr/local/bin/ngrok http 5000 --domain=easily-crankier-coleman.ngrok-free.dev`
