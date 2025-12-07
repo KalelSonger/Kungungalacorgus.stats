@@ -1,0 +1,442 @@
+SPOTIFY STATS - DATABASE VALUES
+================================================================================
+
+SONG STATISTICS FROM 20 MOST RECENT TRACKS
+--------------------------------------------------------------------------------
+
+Song ID: 3AqRtnS48u04MS7hjdlIZg
+Title: Paranoia
+Artist(s): Chance the Rapper, Nosaj Thing
+Album: Acid Rap
+Length: 4:35 (275281 ms)
+Listen Count: 1
+Total Listen Time: 4:35 (275281 ms)
+--------------------------------------------------------------------------------
+Song ID: 77v9kYcrCZV615E0P9WMrD
+Title: Phoenix
+Artist(s): A$AP Rocky
+Album: LONG.LIVE.A$AP (Deluxe Version)
+Length: 3:53 (233880 ms)
+Listen Count: 1
+Total Listen Time: 3:53 (233880 ms)
+--------------------------------------------------------------------------------
+Song ID: 06LQQ8NO6jO57b6I5PMqd1
+Title: We're Finally Landing
+Artist(s): Home
+Album: Before the Night
+Length: 4:32 (272161 ms)
+Listen Count: 1
+Total Listen Time: 4:32 (272161 ms)
+--------------------------------------------------------------------------------
+Song ID: 27oVCAziETRbNuo5A8LNpg
+Title: Solo Dolo, Pt. III
+Artist(s): Kid Cudi
+Album: Man On The Moon III: The Chosen
+Length: 4:02 (242266 ms)
+Listen Count: 2
+Total Listen Time: 8:04 (484532 ms)
+--------------------------------------------------------------------------------
+Song ID: 2MGXx7sKkpm8dRYyQQXmXK
+Title: Skytop Garden
+Artist(s): Nice Guys, JAWNY
+Album: Nice Guys Love You (Vol. 1)
+Length: 2:33 (153750 ms)
+Listen Count: 1
+Total Listen Time: 2:33 (153750 ms)
+--------------------------------------------------------------------------------
+Song ID: 7hmjY41ARYh5v57tkd6hn1
+Title: Breath
+Artist(s): Reverse, Merlyn Wood
+Album: Breath
+Length: 3:49 (229992 ms)
+Listen Count: 1
+Total Listen Time: 3:49 (229992 ms)
+--------------------------------------------------------------------------------
+Song ID: 0udZG8cSCglZowB4XKTfsS
+Title: Chillwave
+Artist(s): Jaymzwright
+Album: Chillwave
+Length: 2:24 (144613 ms)
+Listen Count: 1
+Total Listen Time: 2:24 (144613 ms)
+--------------------------------------------------------------------------------
+Song ID: 12TyU7JblI0e8WhMTck8bF
+Title: The Music Scene
+Artist(s): Blockhead
+Album: The Music Scene
+Length: 4:49 (289573 ms)
+Listen Count: 1
+Total Listen Time: 4:49 (289573 ms)
+--------------------------------------------------------------------------------
+Song ID: 6XEiapN16k6qL2WdmRR5S9
+Title: Flood
+Artist(s): Late Again
+Album: Flood
+Length: 2:35 (155616 ms)
+Listen Count: 1
+Total Listen Time: 2:35 (155616 ms)
+--------------------------------------------------------------------------------
+Song ID: 1dzwFgBlZNxt28aQOinNGn
+Title: Changes
+Artist(s): A$AP Rocky
+Album: TESTING
+Length: 5:14 (314652 ms)
+Listen Count: 1
+Total Listen Time: 5:14 (314652 ms)
+--------------------------------------------------------------------------------
+Song ID: 0qp8MuZNKelOGTK2HPlXBA
+Title: Kids Turned Out Fine
+Artist(s): A$AP Rocky
+Album: TESTING
+Length: 3:03 (183126 ms)
+Listen Count: 1
+Total Listen Time: 3:03 (183126 ms)
+--------------------------------------------------------------------------------
+Song ID: 1rVEiete84zDVoD1UZJPzS
+Title: Homegrown
+Artist(s): Hippie Sabotage
+Album: Trailblazer
+Length: 2:41 (161079 ms)
+Listen Count: 1
+Total Listen Time: 2:41 (161079 ms)
+--------------------------------------------------------------------------------
+Song ID: 2088esDCuzCzbCpjaFKriO
+Title: Last Words - Extended Edit
+Artist(s): Kenny Beats
+Album: Last Words (Extended Edit)
+Length: 2:04 (124213 ms)
+Listen Count: 1
+Total Listen Time: 2:04 (124213 ms)
+--------------------------------------------------------------------------------
+Song ID: 3JC4ReSPU0gLZHLt32UCsm
+Title: Don Juan
+Artist(s): Mac DeMarco
+Album: Some Other Ones
+Length: 1:56 (116863 ms)
+Listen Count: 1
+Total Listen Time: 1:56 (116863 ms)
+--------------------------------------------------------------------------------
+Song ID: 0wWc41jYteDsSbvq7Lanj3
+Title: Release
+Artist(s): Getter, Midoca
+Album: Visceral
+Length: 3:52 (232800 ms)
+Listen Count: 1
+Total Listen Time: 3:52 (232800 ms)
+--------------------------------------------------------------------------------
+Song ID: 440WMk6krUqACSISBTonoG
+Title: Pleasantries
+Artist(s): Ark Patrol
+Album: Geode
+Length: 4:00 (240038 ms)
+Listen Count: 1
+Total Listen Time: 4:00 (240038 ms)
+--------------------------------------------------------------------------------
+Song ID: 16OlG0GeSYrJZQpDd16i79
+Title: Planet Shrooms
+Artist(s): Woodie Smalls
+Album: Planet Shrooms
+Length: 3:24 (204400 ms)
+Listen Count: 1
+Total Listen Time: 3:24 (204400 ms)
+--------------------------------------------------------------------------------
+Song ID: 12s6FjStmOwWJrh0yalbKC
+Title: WEIGHT OFF
+Artist(s): KAYTRANADA, BADBADNOTGOOD
+Album: 99.9%
+Length: 2:35 (155960 ms)
+Listen Count: 1
+Total Listen Time: 2:35 (155960 ms)
+--------------------------------------------------------------------------------
+Song ID: 0FVuyC9RP5MACjp4lgU3qZ
+Title: I'm God
+Artist(s): Clams Casino, Imogen Heap
+Album: Instrumental Relics
+Length: 4:37 (277710 ms)
+Listen Count: 1
+Total Listen Time: 4:37 (277710 ms)
+--------------------------------------------------------------------------------
+Song ID: 21j1PsCiTaO8ZW88UZrh3A
+Title: Shine On You Crazy Diamond (Pts. 6-9)
+Artist(s): Pink Floyd
+Album: Wish You Were Here
+Length: 12:23 (743760 ms)
+Listen Count: 1
+Total Listen Time: 12:23 (743760 ms)
+--------------------------------------------------------------------------------
+Song ID: 6mFkJmJqdDVQ1REhVfGgd1
+Title: Wish You Were Here
+Artist(s): Pink Floyd
+Album: Wish You Were Here
+Length: 5:38 (338466 ms)
+Listen Count: 1
+Total Listen Time: 5:38 (338466 ms)
+--------------------------------------------------------------------------------
+Song ID: 3CmHvyZQQAGkKkTjTBFWN6
+Title: Have a Cigar
+Artist(s): Pink Floyd
+Album: Wish You Were Here
+Length: 5:07 (307400 ms)
+Listen Count: 1
+Total Listen Time: 5:07 (307400 ms)
+--------------------------------------------------------------------------------
+Song ID: 5VWC7v2dC2K0SIIjT9WTLN
+Title: Welcome to the Machine
+Artist(s): Pink Floyd
+Album: Wish You Were Here
+Length: 7:30 (450706 ms)
+Listen Count: 1
+Total Listen Time: 7:30 (450706 ms)
+--------------------------------------------------------------------------------
+Song ID: 6pnwfWyaWjQiHCKTiZLItr
+Title: Shine On You Crazy Diamond (Pts. 1-5)
+Artist(s): Pink Floyd
+Album: Wish You Were Here
+Length: 13:32 (812800 ms)
+Listen Count: 1
+Total Listen Time: 13:32 (812800 ms)
+--------------------------------------------------------------------------------
+
+
+ARTIST STATISTICS
+--------------------------------------------------------------------------------
+
+Artist ID: 1anyVhU62p31KFi8MEzkbf
+Artist Name: Chance the Rapper
+Total Listens: 1
+Total Listen Time: 4:35 (275281 ms)
+--------------------------------------------------------------------------------
+Artist ID: 0IVapwlnM3dEOiMsHXsghT
+Artist Name: Nosaj Thing
+Total Listens: 1
+Total Listen Time: 4:35 (275281 ms)
+--------------------------------------------------------------------------------
+Artist ID: 13ubrt8QOOCPljQ2FL1Kca
+Artist Name: A$AP Rocky
+Total Listens: 3
+Total Listen Time: 12:11 (731658 ms)
+--------------------------------------------------------------------------------
+Artist ID: 2exebQUDoIoT0dXA8BcN1P
+Artist Name: Home
+Total Listens: 1
+Total Listen Time: 4:32 (272161 ms)
+--------------------------------------------------------------------------------
+Artist ID: 0fA0VVWsXO9YnASrzqfmYu
+Artist Name: Kid Cudi
+Total Listens: 2
+Total Listen Time: 8:04 (484532 ms)
+--------------------------------------------------------------------------------
+Artist ID: 3FPxmqqMdZu3QiIhfyZhyN
+Artist Name: Nice Guys
+Total Listens: 1
+Total Listen Time: 2:33 (153750 ms)
+--------------------------------------------------------------------------------
+Artist ID: 25pd339V2rRJo84USlcSRP
+Artist Name: JAWNY
+Total Listens: 1
+Total Listen Time: 2:33 (153750 ms)
+--------------------------------------------------------------------------------
+Artist ID: 3yyMj0HKvaDdsMwMthmdv9
+Artist Name: Reverse
+Total Listens: 1
+Total Listen Time: 3:49 (229992 ms)
+--------------------------------------------------------------------------------
+Artist ID: 5AqnZL03z5cuZJMPVTRj9Y
+Artist Name: Merlyn Wood
+Total Listens: 1
+Total Listen Time: 3:49 (229992 ms)
+--------------------------------------------------------------------------------
+Artist ID: 7CnONexcQBVCpz6tK9oBQ3
+Artist Name: Jaymzwright
+Total Listens: 1
+Total Listen Time: 2:24 (144613 ms)
+--------------------------------------------------------------------------------
+Artist ID: 7bHm3B3jJju0q9FUdOgp3b
+Artist Name: Blockhead
+Total Listens: 1
+Total Listen Time: 4:49 (289573 ms)
+--------------------------------------------------------------------------------
+Artist ID: 7qnOGa8Zkp73wNWyXJauEf
+Artist Name: Late Again
+Total Listens: 1
+Total Listen Time: 2:35 (155616 ms)
+--------------------------------------------------------------------------------
+Artist ID: 4dM6NDYSfLcspt8GLoT5aE
+Artist Name: Hippie Sabotage
+Total Listens: 1
+Total Listen Time: 2:41 (161079 ms)
+--------------------------------------------------------------------------------
+Artist ID: 1rHOtdmGNr5vcYNw5v7QGC
+Artist Name: Kenny Beats
+Total Listens: 1
+Total Listen Time: 2:04 (124213 ms)
+--------------------------------------------------------------------------------
+Artist ID: 3Sz7ZnJQBIHsXLUSo0OQtM
+Artist Name: Mac DeMarco
+Total Listens: 1
+Total Listen Time: 1:56 (116863 ms)
+--------------------------------------------------------------------------------
+Artist ID: 3QryVD03gGZOLQQXjy3EoA
+Artist Name: Getter
+Total Listens: 1
+Total Listen Time: 3:52 (232800 ms)
+--------------------------------------------------------------------------------
+Artist ID: 3k4i4K7PicHqnodnYhXsJy
+Artist Name: Midoca
+Total Listens: 1
+Total Listen Time: 3:52 (232800 ms)
+--------------------------------------------------------------------------------
+Artist ID: 3zaxUd86U92CdZkNa6NUo9
+Artist Name: Ark Patrol
+Total Listens: 1
+Total Listen Time: 4:00 (240038 ms)
+--------------------------------------------------------------------------------
+Artist ID: 1ng2cH6hJIOSYxQMk6pEux
+Artist Name: Woodie Smalls
+Total Listens: 1
+Total Listen Time: 3:24 (204400 ms)
+--------------------------------------------------------------------------------
+Artist ID: 6qgnBH6iDM91ipVXv28OMu
+Artist Name: KAYTRANADA
+Total Listens: 1
+Total Listen Time: 2:35 (155960 ms)
+--------------------------------------------------------------------------------
+Artist ID: 65dGLGjkw3UbddUg2GKQoZ
+Artist Name: BADBADNOTGOOD
+Total Listens: 1
+Total Listen Time: 2:35 (155960 ms)
+--------------------------------------------------------------------------------
+Artist ID: 5vSQUyT33qxr1xAX2Tkf3A
+Artist Name: Clams Casino
+Total Listens: 1
+Total Listen Time: 4:37 (277710 ms)
+--------------------------------------------------------------------------------
+Artist ID: 6Xb4ezwoAQC4516kI89nWz
+Artist Name: Imogen Heap
+Total Listens: 1
+Total Listen Time: 4:37 (277710 ms)
+--------------------------------------------------------------------------------
+Artist ID: 0k17h0D3J5VfsdmQ1iZtE9
+Artist Name: Pink Floyd
+Total Listens: 5
+Total Listen Time: 44:13 (2653132 ms)
+--------------------------------------------------------------------------------
+
+
+ALBUM STATISTICS
+--------------------------------------------------------------------------------
+
+Album ID: 7Ffm3ZluTZRYEdlE5Jjlid
+Album Title: Acid Rap
+Album Listen Time: 4:35 (275281 ms)
+Album Listens: 0
+Album Length: 50:21 (3021300 ms)
+--------------------------------------------------------------------------------
+Album ID: 6rzMufuu8sLkIizM4q9c7J
+Album Title: LONG.LIVE.A$AP (Deluxe Version)
+Album Listen Time: 3:53 (233880 ms)
+Album Listens: 0
+Album Length: 69:16 (4156941 ms)
+--------------------------------------------------------------------------------
+Album ID: 1vKCVk9VHuC51CCITEwThO
+Album Title: Before the Night
+Album Listen Time: 4:32 (272161 ms)
+Album Listens: 0
+Album Length: 42:47 (2567125 ms)
+--------------------------------------------------------------------------------
+Album ID: 64nbgEEIcY4g1ElVLONJ0w
+Album Title: Man On The Moon III: The Chosen
+Album Listen Time: 8:04 (484532 ms)
+Album Listens: 0
+Album Length: 58:24 (3504154 ms)
+--------------------------------------------------------------------------------
+Album ID: 4eW7jDOFO874ue4vEmf1qL
+Album Title: Nice Guys Love You (Vol. 1)
+Album Listen Time: 2:33 (153750 ms)
+Album Listens: 0
+Album Length: 84:47 (5087603 ms)
+--------------------------------------------------------------------------------
+Album ID: 1EIa9egZbAOgWhcMFR06Ks
+Album Title: Breath
+Album Listen Time: 3:49 (229992 ms)
+Album Listens: 1
+Album Length: 3:49 (229992 ms)
+--------------------------------------------------------------------------------
+Album ID: 2yPbqpyDHWu4S8x1Lzs7u7
+Album Title: Chillwave
+Album Listen Time: 2:24 (144613 ms)
+Album Listens: 1
+Album Length: 2:24 (144613 ms)
+--------------------------------------------------------------------------------
+Album ID: 4i0QEXwMps7KIuVq5PBckJ
+Album Title: The Music Scene
+Album Listen Time: 4:49 (289573 ms)
+Album Listens: 0
+Album Length: 63:23 (3803218 ms)
+--------------------------------------------------------------------------------
+Album ID: 2qrrJblmFCFKdcIDNqj9JX
+Album Title: Flood
+Album Listen Time: 2:35 (155616 ms)
+Album Listens: 1
+Album Length: 2:35 (155616 ms)
+--------------------------------------------------------------------------------
+Album ID: 3MATDdrpHmQCmuOcozZjDa
+Album Title: TESTING
+Album Listen Time: 8:17 (497778 ms)
+Album Listens: 0
+Album Length: 52:24 (3144660 ms)
+--------------------------------------------------------------------------------
+Album ID: 1qfo2CYrCBl2o4svNmWDt0
+Album Title: Trailblazer
+Album Listen Time: 2:41 (161079 ms)
+Album Listens: 0
+Album Length: 75:49 (4549213 ms)
+--------------------------------------------------------------------------------
+Album ID: 4CaOaq3dNi7N0S6oZ7JbSW
+Album Title: Last Words (Extended Edit)
+Album Listen Time: 2:04 (124213 ms)
+Album Listens: 1
+Album Length: 2:04 (124213 ms)
+--------------------------------------------------------------------------------
+Album ID: 3f62e1h3kXSfQBBatUG7vq
+Album Title: Some Other Ones
+Album Listen Time: 1:56 (116863 ms)
+Album Listens: 0
+Album Length: 22:12 (1332535 ms)
+--------------------------------------------------------------------------------
+Album ID: 1em135xxcFTagj0FrkcT5a
+Album Title: Visceral
+Album Listen Time: 3:52 (232800 ms)
+Album Listens: 0
+Album Length: 54:44 (3284710 ms)
+--------------------------------------------------------------------------------
+Album ID: 3ZHnX7MtqZ2lzcIy2frrqC
+Album Title: Geode
+Album Listen Time: 4:00 (240038 ms)
+Album Listens: 0
+Album Length: 31:48 (1908099 ms)
+--------------------------------------------------------------------------------
+Album ID: 41eV1FPjtPTSVKyb3n4dAP
+Album Title: Planet Shrooms
+Album Listen Time: 3:24 (204400 ms)
+Album Listens: 1
+Album Length: 3:24 (204400 ms)
+--------------------------------------------------------------------------------
+Album ID: 6JD4Qerb8IcaAzFgpFw0sa
+Album Title: 99.9%
+Album Listen Time: 2:35 (155960 ms)
+Album Listens: 0
+Album Length: 59:15 (3555236 ms)
+--------------------------------------------------------------------------------
+Album ID: 66eXLlqksAwNndmHaHWtCq
+Album Title: Instrumental Relics
+Album Listen Time: 4:37 (277710 ms)
+Album Listens: 0
+Album Length: 56:52 (3412229 ms)
+--------------------------------------------------------------------------------
+Album ID: 0bCAjiUamIFqKJsekOYuRw
+Album Title: Wish You Were Here
+Album Listen Time: 44:13 (2653132 ms)
+Album Listens: 1
+Album Length: 44:13 (2653132 ms)
+--------------------------------------------------------------------------------

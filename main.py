@@ -4,6 +4,7 @@ import urllib.parse
 import json
 import subprocess
 import time
+import glob
 
 from flask import Flask, redirect, request, session, jsonify
 from datetime import datetime, timedelta
@@ -97,6 +98,7 @@ def menu():
     <h1>Spotify Stats Menu</h1>
     <ul>
         <li><a href='/recent_50_songs'>50 Recent</a></li>
+        <li><a href='/database_values'>Database Values</a></li>
     </ul>
     <a href='/'>Back to home</a>
     """
@@ -163,6 +165,344 @@ def recent_50_songs():
     
     html += """
     </table>
+    <br>
+    <a href='/menu'>Back to menu</a> | <a href='/'>Back to home</a>
+    """
+    
+    return html
+
+@app.route('/database_values')
+def database_values():
+    if 'access_token' not in session:
+        return redirect('/login')
+    
+    if datetime.now().timestamp() > session['expires_at']:
+        return redirect('/refresh_token')
+    
+    headers = {
+        'Authorization': f"Bearer {session['access_token']}"
+    }
+    
+    # Fetch user profile
+    profile_response = requests.get(API_BASE_URL + '/me', headers=headers)
+    user_profile = profile_response.json()
+    user_id = user_profile.get('id', 'N/A')
+    user_username = user_profile.get('display_name', 'N/A')
+    
+    # Fetch all playlists
+    all_playlists = []
+    playlists_response = requests.get(API_BASE_URL + '/me/playlists?limit=50', headers=headers)
+    playlists = playlists_response.json()
+    if 'items' in playlists:
+        for playlist in playlists['items']:
+            all_playlists.append({
+                'id': playlist['id'],
+                'name': playlist['name']
+            })
+    
+    # Fetch 25 most recent songs
+    recent_response = requests.get(API_BASE_URL + '/me/player/recently-played?limit=25', headers=headers)
+    recent = recent_response.json()
+    
+    # Dictionary to track song stats: {song_id: {title, length_ms, listen_count, artists, album}}
+    song_stats = {}
+    # Dictionary to track artist stats: {artist_id: {name, listens, listen_time_ms}}
+    artist_stats = {}
+    # Dictionary to track album stats: {album_id: {title, songs: {song_id: {length, listen_count, listen_time}}}}
+    album_stats = {}
+    
+    if 'items' in recent:
+        for item in recent['items']:
+            track = item['track']
+            song_id = track['id']
+            song_title = track['name']
+            song_length_ms = track['duration_ms']
+            artists = track['artists']
+            album = track['album']
+            album_id = album['id']
+            album_title = album['name']
+            
+            if song_id in song_stats:
+                # Song already exists, increment listen count
+                song_stats[song_id]['listen_count'] += 1
+            else:
+                # New song, add to dictionary
+                song_stats[song_id] = {
+                    'title': song_title,
+                    'length_ms': song_length_ms,
+                    'listen_count': 1,
+                    'artists': artists,
+                    'album_id': album_id,
+                    'album_title': album_title
+                }
+    
+    # Calculate listen time for each song (length * listen_count)
+    song_list = []
+    for song_id, stats in song_stats.items():
+        listen_time_ms = stats['length_ms'] * stats['listen_count']
+        
+        # Format artist names
+        artist_names = ', '.join([artist['name'] for artist in stats['artists']])
+        
+        song_list.append({
+            'id': song_id,
+            'title': stats['title'],
+            'artists': artist_names,
+            'album_title': stats['album_title'],
+            'length_ms': stats['length_ms'],
+            'length_formatted': f"{stats['length_ms'] // 60000}:{(stats['length_ms'] % 60000) // 1000:02d}",
+            'listen_count': stats['listen_count'],
+            'listen_time_ms': listen_time_ms,
+            'listen_time_formatted': f"{listen_time_ms // 60000}:{(listen_time_ms % 60000) // 1000:02d}"
+        })
+        
+        # Aggregate artist stats
+        for artist in stats['artists']:
+            artist_id = artist['id']
+            artist_name = artist['name']
+            
+            if artist_id in artist_stats:
+                # Artist already exists, add to their stats
+                artist_stats[artist_id]['listens'] += stats['listen_count']
+                artist_stats[artist_id]['listen_time_ms'] += listen_time_ms
+            else:
+                # New artist, add to dictionary
+                artist_stats[artist_id] = {
+                    'name': artist_name,
+                    'listens': stats['listen_count'],
+                    'listen_time_ms': listen_time_ms
+                }
+        
+        # Aggregate album stats
+        album_id = stats['album_id']
+        album_title = stats['album_title']
+        
+        if album_id not in album_stats:
+            album_stats[album_id] = {
+                'title': album_title,
+                'songs': {}
+            }
+        
+        # Track this song within the album
+        album_stats[album_id]['songs'][song_id] = {
+            'length_ms': stats['length_ms'],
+            'listen_count': stats['listen_count'],
+            'listen_time_ms': listen_time_ms
+        }
+    
+    # Create artist list with formatted times
+    artist_list = []
+    for artist_id, stats in artist_stats.items():
+        artist_list.append({
+            'id': artist_id,
+            'name': stats['name'],
+            'listens': stats['listens'],
+            'listen_time_ms': stats['listen_time_ms'],
+            'listen_time_formatted': f"{stats['listen_time_ms'] // 60000}:{(stats['listen_time_ms'] % 60000) // 1000:02d}"
+        })
+    
+    # Create album list with calculated stats
+    album_list = []
+    for album_id, stats in album_stats.items():
+        # Fetch full album details to get ALL tracks on the album
+        album_response = requests.get(API_BASE_URL + f'/albums/{album_id}', headers=headers)
+        album_data = album_response.json()
+        
+        # Get all track IDs from the full album
+        all_album_track_ids = set()
+        if 'tracks' in album_data and 'items' in album_data['tracks']:
+            for track in album_data['tracks']['items']:
+                all_album_track_ids.add(track['id'])
+        
+        # Calculate total listen time (sum of all song listen times in this album from our recent plays)
+        total_listen_time_ms = sum(song['listen_time_ms'] for song in stats['songs'].values())
+        
+        # Calculate total album length (sum of all song lengths from the full album)
+        total_album_length_ms = 0
+        if 'tracks' in album_data and 'items' in album_data['tracks']:
+            for track in album_data['tracks']['items']:
+                total_album_length_ms += track['duration_ms']
+        
+        # Calculate album listens (minimum listen count across ALL songs on the full album)
+        # If a song from the album hasn't been played, its listen count is 0
+        min_listen_count = 0
+        if all_album_track_ids:
+            # For each track on the album, get its listen count (0 if not in our recent plays)
+            listen_counts = []
+            for track_id in all_album_track_ids:
+                if track_id in stats['songs']:
+                    listen_counts.append(stats['songs'][track_id]['listen_count'])
+                else:
+                    listen_counts.append(0)  # Song not in recent plays = 0 listens
+            
+            min_listen_count = min(listen_counts) if listen_counts else 0
+        
+        album_list.append({
+            'id': album_id,
+            'title': stats['title'],
+            'listen_time_ms': total_listen_time_ms,
+            'listen_time_formatted': f"{total_listen_time_ms // 60000}:{(total_listen_time_ms % 60000) // 1000:02d}",
+            'listens': min_listen_count,
+            'length_ms': total_album_length_ms,
+            'length_formatted': f"{total_album_length_ms // 60000}:{(total_album_length_ms % 60000) // 1000:02d}"
+        })
+    
+    # Delete old database_values txt files
+    old_files = glob.glob('database_values_*.txt')
+    for old_file in old_files:
+        try:
+            os.remove(old_file)
+        except:
+            pass  # If file can't be deleted, just continue
+    
+    # Save to txt file
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'database_values_{timestamp}.txt'
+    
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write("SPOTIFY STATS - DATABASE VALUES\n")
+        f.write("=" * 80 + "\n\n")
+        
+        f.write("SONG STATISTICS FROM 20 MOST RECENT TRACKS\n")
+        f.write("-" * 80 + "\n\n")
+        
+        for song in song_list:
+            f.write(f"Song ID: {song['id']}\n")
+            f.write(f"Title: {song['title']}\n")
+            f.write(f"Artist(s): {song['artists']}\n")
+            f.write(f"Album: {song['album_title']}\n")
+            f.write(f"Length: {song['length_formatted']} ({song['length_ms']} ms)\n")
+            f.write(f"Listen Count: {song['listen_count']}\n")
+            f.write(f"Total Listen Time: {song['listen_time_formatted']} ({song['listen_time_ms']} ms)\n")
+            f.write("-" * 80 + "\n")
+        
+        f.write("\n\nARTIST STATISTICS\n")
+        f.write("-" * 80 + "\n\n")
+        
+        for artist in artist_list:
+            f.write(f"Artist ID: {artist['id']}\n")
+            f.write(f"Artist Name: {artist['name']}\n")
+            f.write(f"Total Listens: {artist['listens']}\n")
+            f.write(f"Total Listen Time: {artist['listen_time_formatted']} ({artist['listen_time_ms']} ms)\n")
+            f.write("-" * 80 + "\n")
+        
+        f.write("\n\nALBUM STATISTICS\n")
+        f.write("-" * 80 + "\n\n")
+        
+        for album in album_list:
+            f.write(f"Album ID: {album['id']}\n")
+            f.write(f"Album Title: {album['title']}\n")
+            f.write(f"Album Listen Time: {album['listen_time_formatted']} ({album['listen_time_ms']} ms)\n")
+            f.write(f"Album Listens: {album['listens']}\n")
+            f.write(f"Album Length: {album['length_formatted']} ({album['length_ms']} ms)\n")
+            f.write("-" * 80 + "\n")
+    
+    # Build HTML response
+    html = f"""
+    <h1>Database Values - Song, Artist & Album Statistics</h1>
+    <p><em>Data saved to: {filename}</em></p>
+    <p><em>Based on your 25 most recently played tracks</em></p>
+    
+    <h2>User Information</h2>
+    <p><strong>Username:</strong> {user_username}</p>
+    <p><strong>User ID:</strong> {user_id}</p>
+    
+    <h2>Song Statistics</h2>
+    <table border="1" style="border-collapse: collapse; width: 100%;">
+        <tr>
+            <th style="padding: 10px;">Song ID</th>
+            <th style="padding: 10px;">Title</th>
+            <th style="padding: 10px;">Artist(s)</th>
+            <th style="padding: 10px;">Album</th>
+            <th style="padding: 10px;">Length</th>
+            <th style="padding: 10px;">Listen Count</th>
+            <th style="padding: 10px;">Total Listen Time</th>
+        </tr>
+    """
+    
+    for song in song_list:
+        html += f"""
+        <tr>
+            <td style="padding: 10px;">{song['id']}</td>
+            <td style="padding: 10px;">{song['title']}</td>
+            <td style="padding: 10px;">{song['artists']}</td>
+            <td style="padding: 10px;">{song['album_title']}</td>
+            <td style="padding: 10px;">{song['length_formatted']}</td>
+            <td style="padding: 10px;">{song['listen_count']}</td>
+            <td style="padding: 10px;">{song['listen_time_formatted']}</td>
+        </tr>
+        """
+    
+    html += """
+    </table>
+    
+    <h2>Artist Statistics</h2>
+    <table border="1" style="border-collapse: collapse; width: 100%;">
+        <tr>
+            <th style="padding: 10px;">Artist ID</th>
+            <th style="padding: 10px;">Artist Name</th>
+            <th style="padding: 10px;">Total Listens</th>
+            <th style="padding: 10px;">Total Listen Time</th>
+        </tr>
+    """
+    
+    for artist in artist_list:
+        html += f"""
+        <tr>
+            <td style="padding: 10px;">{artist['id']}</td>
+            <td style="padding: 10px;">{artist['name']}</td>
+            <td style="padding: 10px;">{artist['listens']}</td>
+            <td style="padding: 10px;">{artist['listen_time_formatted']}</td>
+        </tr>
+        """
+    
+    html += """
+    </table>
+    
+    <h2>Album Statistics</h2>
+    <table border="1" style="border-collapse: collapse; width: 100%;">
+        <tr>
+            <th style="padding: 10px;">Album ID</th>
+            <th style="padding: 10px;">Album Title</th>
+            <th style="padding: 10px;">Total Listen Time</th>
+            <th style="padding: 10px;">Album Listens</th>
+            <th style="padding: 10px;">Album Length</th>
+        </tr>
+    """
+    
+    for album in album_list:
+        html += f"""
+        <tr>
+            <td style="padding: 10px;">{album['id']}</td>
+            <td style="padding: 10px;">{album['title']}</td>
+            <td style="padding: 10px;">{album['listen_time_formatted']}</td>
+            <td style="padding: 10px;">{album['listens']}</td>
+            <td style="padding: 10px;">{album['length_formatted']}</td>
+        </tr>
+        """
+    
+    html += """
+    </table>
+    
+    <h2>Your Playlists</h2>
+    <table border="1" style="border-collapse: collapse; width: 100%;">
+        <tr>
+            <th style="padding: 10px;">Playlist ID</th>
+            <th style="padding: 10px;">Playlist Name</th>
+        </tr>
+    """
+    
+    for playlist in all_playlists:
+        html += f"""
+        <tr>
+            <td style="padding: 10px;">{playlist['id']}</td>
+            <td style="padding: 10px;">{playlist['name']}</td>
+        </tr>
+        """
+    
+    html += """
+    </table>
+    
     <br>
     <a href='/menu'>Back to menu</a> | <a href='/'>Back to home</a>
     """
