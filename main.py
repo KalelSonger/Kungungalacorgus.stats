@@ -82,79 +82,14 @@ def callback():
         error_desc = request.args.get('error_description', 'No description')
         return jsonify({'error': error_msg, 'description': error_desc})
 
-    if 'code' in request.args:
-        req_body = {
-            'code': request.args['code'],
-            'grant_type': 'authorization_code',
-            'redirect_uri': REDIRECT_URI,
-            'client_id': CLIENT_ID,
-            'client_secret': CLIENT_SECRET,
-        }
-
-        response = requests.post(TOKEN_URL, data=req_body)
-        token_info = response.json()
-
-        session['access_token'] = token_info['access_token']
-        session['refresh_token'] = token_info.get('refresh_token', session.get('refresh_token'))
-        session['expires_at'] = datetime.now().timestamp() + token_info.get('expires_in', 3600)
-
-        return redirect('/menu')
-
-@app.route('/menu')
-def menu():
-    if 'access_token' not in session:
-        return redirect('/login')
-    
     html = """
     <h1>Spotify Stats Menu</h1>
     <ul>
-        <li><a href='/recent_50_songs'>50 Recent</a></li>
         <li><a href='/database_values'>Database Values</a></li>
     </ul>
     <a href='/'>Back to home</a>
     """
-    return html
 
-@app.route('/recent_50_songs')
-def recent_50_songs():
-    if 'access_token' not in session:
-        return redirect('/login')
-    
-    if datetime.now().timestamp() > session['expires_at']:
-        return redirect('/refresh_token')
-    
-    headers = {
-        'Authorization': f"Bearer {session['access_token']}"
-    }
-    
-    response = requests.get(API_BASE_URL + '/me/player/recently-played?limit=50', headers=headers)
-    recently_played = response.json()
-    
-    songs = []
-    if 'items' in recently_played:
-        for item in recently_played['items']:
-            if 'track' in item:
-                track = item['track']
-                song_name = track.get('name', 'Unknown')
-                artists = ', '.join([artist['name'] for artist in track.get('artists', []) if 'name' in artist])
-                album = track.get('album', {}).get('name', 'Unknown')
-                duration_ms = track.get('duration_ms', 0)
-                duration_min = duration_ms // 60000
-                duration_sec = (duration_ms % 60000) // 1000
-                duration = f"{duration_min}:{duration_sec:02d}"
-                
-                songs.append({
-                    'name': song_name,
-                    'artists': artists,
-                    'album': album,
-                    'duration': duration
-                })
-    
-    # Save to txt file
-    
-    html = """
-    <h1>Your 50 Most Recently Listened Songs</h1>
-        <p><em>No data saved to file.</em></p>
     <table border="1" style="border-collapse: collapse; width: 100%;">
     <tr>
         <th style="padding: 10px; text-align: left;">Song Name</th>
@@ -202,11 +137,15 @@ def database_values():
         user_id = user_profile.get('id', 'N/A')
         user_username = user_profile.get('display_name', 'N/A')
     except requests.exceptions.RequestException as e:
+        extra_note = ""
+        if profile_response is not None and profile_response.status_code == 403:
+            extra_note = "<p><strong>Tip:</strong> Make sure this Spotify account is added as a user/tester in developer.spotify.com &gt; Dashboard &gt; Users and Access for this app.</p>"
         return f"""
         <h1>Error Fetching User Profile</h1>
         <p>Status Code: {profile_response.status_code}</p>
         <p>Response: {profile_response.text}</p>
         <p>Error: {str(e)}</p>
+        {extra_note}
         <p><a href='/login'>Try logging in again</a></p>
         """
     except ValueError as e:
