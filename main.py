@@ -17,26 +17,23 @@ app.secret_key = '84g299n6-179k-4228-m245-0r1629562837'
 CLIENT_ID = os.getenv('CLIENT_ID', '2a061e08a3f94fd68b36a41fc9922a3b')
 CLIENT_SECRET = os.getenv('CLIENT_SECRET', '599323f77f88464fbe768772e4d4c716')
 
-# Static ngrok domain for consistent redirect URI
 NGROK_DOMAIN = 'easily-crankier-coleman.ngrok-free.dev'
 REDIRECT_URI = os.getenv('REDIRECT_URI', f'https://{NGROK_DOMAIN}/callback')
 
-# Start ngrok tunnel automatically
 def start_ngrok():
-    # Detect OS and find ngrok executable
     system = platform.system()
     
     if system == 'Windows':
         ngrok_path = os.path.expanduser('~\\AppData\\Local\\Microsoft\\WindowsApps\\ngrok.exe')
-    elif system == 'Darwin':  # MacOS
+    elif system == 'Darwin':
         ngrok_path = shutil.which('ngrok') or os.path.expanduser('~/.ngrok2/ngrok')
-    else:  # Linux and other Unix-like systems
+    else:
         ngrok_path = shutil.which('ngrok') or '/usr/local/bin/ngrok'
     
     try:
         subprocess.Popen([ngrok_path, 'http', '5000', f'--domain={NGROK_DOMAIN}'], 
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        time.sleep(2)  # Give ngrok time to start
+        time.sleep(2)
         print("✓ ngrok tunnel started successfully")
         print(f"   App available at: https://{NGROK_DOMAIN}")
         print(f"\n   IMPORTANT: Your professor must configure ngrok authtoken on their machine:")
@@ -69,7 +66,6 @@ def login():
     }
     
     auth_url = f"{AUTH_URL}?{urllib.parse.urlencode(params)}"
-    # If DEBUG_AUTH_URL=1 is set, return the full auth URL for inspection
     if os.getenv('DEBUG_AUTH_URL', '0') == '1':
         return auth_url
 
@@ -89,31 +85,6 @@ def callback():
     </ul>
     <a href='/'>Back to home</a>
     """
-
-    <table border="1" style="border-collapse: collapse; width: 100%;">
-    <tr>
-        <th style="padding: 10px; text-align: left;">Song Name</th>
-        <th style="padding: 10px; text-align: left;">Artists</th>
-        <th style="padding: 10px; text-align: left;">Album</th>
-        <th style="padding: 10px; text-align: center;">Length</th>
-    </tr>
-    """
-    
-    for i, song in enumerate(songs, 1):
-        html += f"""
-        <tr>
-            <td style="padding: 10px;">{song['name']}</td>
-            <td style="padding: 10px;">{song['artists']}</td>
-            <td style="padding: 10px;">{song['album']}</td>
-            <td style="padding: 10px; text-align: center;">{song['duration']}</td>
-        </tr>
-        """
-    
-    html += """
-    </table>
-    <br>
-    <a href='/menu'>Back to menu</a> | <a href='/'>Back to home</a>
-    """
     
     return html
 
@@ -129,7 +100,6 @@ def database_values():
         'Authorization': f"Bearer {session['access_token']}"
     }
     
-    # Fetch user profile
     try:
         profile_response = requests.get(API_BASE_URL + '/me', headers=headers)
         profile_response.raise_for_status()  # Raise exception for bad status codes
@@ -157,7 +127,6 @@ def database_values():
         <p><a href='/login'>Try logging in again</a></p>
         """
     
-    # Fetch all playlists
     all_playlists = []
     try:
         playlists_response = requests.get(API_BASE_URL + '/me/playlists?limit=50', headers=headers)
@@ -181,7 +150,6 @@ def database_values():
                 'name': playlist['name']
             })
     
-    # Fetch 25 most recent songs
     try:
         recent_response = requests.get(API_BASE_URL + '/me/player/recently-played?limit=25', headers=headers)
         recent_response.raise_for_status()
@@ -203,11 +171,8 @@ def database_values():
         <p><a href='/login'>Try logging in again</a></p>
         """
     
-    # Dictionary to track song stats: {song_id: {title, length_ms, listen_count, artists, album}}
     song_stats = {}
-    # Dictionary to track artist stats: {artist_id: {name, listens, listen_time_ms}}
     artist_stats = {}
-    # Dictionary to track album stats: {album_id: {title, songs: {song_id: {length, listen_count, listen_time}}}}
     album_stats = {}
     
     if 'items' in recent:
@@ -222,10 +187,8 @@ def database_values():
             album_title = album['name']
             
             if song_id in song_stats:
-                # Song already exists, increment listen count
                 song_stats[song_id]['listen_count'] += 1
             else:
-                # New song, add to dictionary
                 song_stats[song_id] = {
                     'title': song_title,
                     'length_ms': song_length_ms,
@@ -235,12 +198,9 @@ def database_values():
                     'album_title': album_title
                 }
     
-    # Calculate listen time for each song (length * listen_count)
     song_list = []
     for song_id, stats in song_stats.items():
         listen_time_ms = stats['length_ms'] * stats['listen_count']
-        
-        # Format artist names
         artist_names = ', '.join([artist['name'] for artist in stats['artists']])
         
         song_list.append({
@@ -255,24 +215,19 @@ def database_values():
             'listen_time_formatted': f"{listen_time_ms // 60000}:{(listen_time_ms % 60000) // 1000:02d}"
         })
         
-        # Aggregate artist stats
         for artist in stats['artists']:
             artist_id = artist['id']
             artist_name = artist['name']
             
             if artist_id in artist_stats:
-                # Artist already exists, add to their stats
                 artist_stats[artist_id]['listens'] += stats['listen_count']
                 artist_stats[artist_id]['listen_time_ms'] += listen_time_ms
             else:
-                # New artist, add to dictionary
                 artist_stats[artist_id] = {
                     'name': artist_name,
                     'listens': stats['listen_count'],
                     'listen_time_ms': listen_time_ms
                 }
-        
-        # Aggregate album stats
         album_id = stats['album_id']
         album_title = stats['album_title']
         
