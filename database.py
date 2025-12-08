@@ -9,28 +9,23 @@ load_dotenv()
 def create_database_if_not_exists():
     """Create the database and user if they don't exist"""
     try:
-        # Get password from environment
         db_password = os.getenv('DB_PASSWORD', '')
-        # Treat placeholder text as empty password
         if db_password in ['your_mysql_root_password_here', 'YOUR_PASSWORD_HERE', 'password']:
             db_password = ''
         
-        # Connect without specifying database
         connection = mysql.connector.connect(
             host=os.getenv('DB_HOST', 'localhost'),
             port=int(os.getenv('DB_PORT', 3306)),
-            user='root',  # Need root to create database
+            user='root',
             password=db_password
         )
         
         cursor = connection.cursor()
         
-        # Create database if it doesn't exist
         db_name = os.getenv('DB_NAME', 'spotifyDatabase')
         cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
         print(f"✓ Database '{db_name}' ready")
         
-        # Create user if it doesn't exist (MySQL 5.7+ syntax)
         db_user = os.getenv('DB_USER', 'spotify_user')
         db_pass = os.getenv('DB_PASSWORD', '')
         
@@ -40,7 +35,6 @@ def create_database_if_not_exists():
             cursor.execute("FLUSH PRIVILEGES")
             print(f"✓ Database user '{db_user}' configured")
         except Error as e:
-            # User might already exist, that's okay
             pass
         
         cursor.close()
@@ -48,20 +42,15 @@ def create_database_if_not_exists():
         return True
         
     except Error as e:
-        # Auto-creation failed - could be wrong password or database already exists
         error_msg = str(e)
         if "Access denied" in error_msg:
             print(f"⚠ Could not connect as root user. If your MySQL has a password, set DB_PASSWORD in .env")
             print(f"  If your MySQL has no password, try: DB_PASSWORD= (blank after equals sign)")
-        # This is fine, will try connecting with regular credentials next
         return False
 
 def get_db_connection():
-    """Create and return a MySQL database connection"""
     try:
-        # Get password from environment
         db_password = os.getenv('DB_PASSWORD', '')
-        # Treat placeholder text as empty password
         if db_password in ['your_mysql_root_password_here', 'YOUR_PASSWORD_HERE', 'password']:
             db_password = ''
             
@@ -102,7 +91,7 @@ def create_indexes():
         
         conn.commit()
         cursor.close()
-        print("✓ Database indexes created successfully")
+        print("Database indexes created successfully")
         return True
     except Error as e:
         print(f"Note: Could not create indexes (may already exist): {e}")
@@ -111,9 +100,8 @@ def create_indexes():
         if conn.is_connected():
             conn.close()
 
+#Initialize the database, create if needed, then verify tables
 def init_database():
-    """Initialize the database - create if needed, then verify tables"""
-    # Try to create database if it doesn't exist
     create_database_if_not_exists()
     
     connection = get_db_connection()
@@ -123,13 +111,11 @@ def init_database():
     
     try:
         cursor = connection.cursor()
-        # Just verify connection works
         cursor.execute("SHOW TABLES")
         tables = cursor.fetchall()
         cursor.close()
-        print(f"✓ Connected to database successfully ({len(tables)} tables found)")
+        print(f"Connected to database successfully ({len(tables)} tables found)")
         
-        # Create indexes for performance
         create_indexes()
         
         return True
@@ -140,11 +126,11 @@ def init_database():
         if connection.is_connected():
             connection.close()
 
+#Insert a new song or update existing song's listen count and time
 def insert_or_update_song(song_data):
-    """Insert a new song or update existing song's listen count and time"""
     connection = get_db_connection()
     if not connection:
-        print(f"⚠ Failed to connect to database for song: {song_data.get('title', 'Unknown')}")
+        print(f"Failed to connect to database for song: {song_data.get('title', 'Unknown')}")
         return False
     
     try:
@@ -212,7 +198,6 @@ def insert_or_update_song(song_data):
         is_blacklisted = song_data.get('is_blacklisted', False)
         
         if result:
-            # Update existing song - increment appropriate counters
             new_listen_count = result[0] + (0 if is_blacklisted else 1)
             new_listen_time = result[1] + (0 if is_blacklisted else song_data['length_ms'])
             new_blacklisted_listens = result[2] + (1 if is_blacklisted else 0)
@@ -226,7 +211,6 @@ def insert_or_update_song(song_data):
             """, (new_listen_count, new_listen_time, new_blacklisted_listens, new_blacklisted_time,
                   played_at_str, song_data.get('image_url'), song_data['id']))
         else:
-            # Insert new song
             initial_listens = 0 if is_blacklisted else 1
             initial_time = 0 if is_blacklisted else song_data['length_ms']
             initial_blacklisted_listens = 1 if is_blacklisted else 0
@@ -238,7 +222,7 @@ def insert_or_update_song(song_data):
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 song_data['id'],
-                song_data['title'][:50],  # Limit to 50 chars per schema
+                song_data['title'][:50],  
                 song_data['length_ms'],
                 initial_listens,
                 initial_time,
@@ -259,8 +243,8 @@ def insert_or_update_song(song_data):
         if connection.is_connected():
             connection.close()
 
+#Insert a new artist or update existing artist's stats
 def insert_or_update_artist(artist_id, artist_name, song_length_ms, image_url=None, is_blacklisted=False):
-    """Insert a new artist or update existing artist's stats"""
     connection = get_db_connection()
     if not connection:
         return False
@@ -302,14 +286,12 @@ def insert_or_update_artist(artist_id, artist_name, song_length_ms, image_url=No
         if cursor.fetchone()[0] == 0:
             cursor.execute("ALTER TABLE Artists ADD COLUMN A_Blacklisted_Time BIGINT DEFAULT 0")
             connection.commit()
-            print("✓ Added A_Blacklisted_Time column to Artists table")
+            print("Added A_Blacklisted_Time column to Artists table")
         
-        # Check if artist exists
         cursor.execute("SELECT A_Listens, A_ListenTime, A_Blacklisted_Listens, A_Blacklisted_Time FROM Artists WHERE A_ID = %s", (artist_id,))
         result = cursor.fetchone()
         
         if result:
-            # Update existing artist
             new_listens = result[0] + (0 if is_blacklisted else 1)
             new_listen_time = result[1] + (0 if is_blacklisted else song_length_ms)
             new_blacklisted_listens = result[2] + (1 if is_blacklisted else 0)
@@ -322,7 +304,6 @@ def insert_or_update_artist(artist_id, artist_name, song_length_ms, image_url=No
                 WHERE A_ID = %s
             """, (new_listens, new_listen_time, new_blacklisted_listens, new_blacklisted_time, image_url, artist_id))
         else:
-            # Insert new artist
             initial_listens = 0 if is_blacklisted else 1
             initial_time = 0 if is_blacklisted else song_length_ms
             initial_blacklisted_listens = 1 if is_blacklisted else 0
@@ -345,11 +326,11 @@ def insert_or_update_artist(artist_id, artist_name, song_length_ms, image_url=No
         if connection.is_connected():
             connection.close()
 
+#Create a link between song, artist, and album in the Creates table
 def link_song_artist_album(song_id, artist_id, album_id):
-    """Create a link between song, artist, and album in the Creates table"""
     connection = get_db_connection()
     if not connection:
-        print(f"⚠ Failed to connect for linking song {song_id}")
+        print(f"!!! Failed to connect for linking song {song_id}")
         return False
     
     try:
@@ -368,8 +349,8 @@ def link_song_artist_album(song_id, artist_id, album_id):
         if connection.is_connected():
             connection.close()
 
+    #Create a link between album and song in Album_Song table
 def link_album_song(album_id, song_id):
-    """Create a link between album and song in Album_Song table"""
     connection = get_db_connection()
     if not connection:
         return False
@@ -390,9 +371,8 @@ def link_album_song(album_id, song_id):
         if connection.is_connected():
             connection.close()
 
+#Insert a new album or update existing album's stats
 def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms, song_length_ms, image_url=None, is_blacklisted=False):
-    """Insert a new album or update existing album's stats
-    Note: A_Listens will be calculated as MIN(song listens) only if ALL tracks have been listened to"""
     connection = get_db_connection()
     if not connection:
         return False
@@ -448,18 +428,15 @@ def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms,
             connection.commit()
             print("✓ Added A_Blacklisted_Time column to Albums table")
         
-        # Check if album exists
         cursor.execute("SELECT A_Listen_Time, total_tracks, A_Blacklisted_Listens, A_Blacklisted_Time FROM Albums WHERE A_ID = %s", (album_id,))
         result = cursor.fetchone()
         
         if result:
-            # Update existing album
             new_listen_time = result[0] + (0 if is_blacklisted else song_length_ms)
             stored_total_tracks = result[1] if result[1] else total_tracks
             new_blacklisted_listens = result[2] + (1 if is_blacklisted else 0)
             new_blacklisted_time = result[3] + (song_length_ms if is_blacklisted else 0)
             
-            # Calculate complete album listens:
             # Check if user has listened to ALL tracks in the album
             cursor.execute("""
                 SELECT COUNT(DISTINCT s.S_ID) as songs_in_db
@@ -478,10 +455,8 @@ def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms,
                     WHERE als.A_ID = %s AND s.flag = 1
                 """, (album_id,))
                 min_result = cursor.fetchone()
-                # If MIN is 0, that means at least one song hasn't been played
                 complete_listens = min_result[0] if min_result and min_result[0] and min_result[0] > 0 else 0
             else:
-                # User hasn't listened to all tracks yet
                 complete_listens = 0
             
             cursor.execute("""
@@ -492,7 +467,6 @@ def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms,
             """, (new_listen_time, complete_listens, new_blacklisted_listens, new_blacklisted_time,
                   stored_total_tracks, image_url, album_id))
         else:
-            # Insert new album with 0 listens initially
             initial_listens = 0
             initial_time = 0 if is_blacklisted else song_length_ms
             initial_blacklisted_listens = 1 if is_blacklisted else 0
@@ -515,9 +489,9 @@ def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms,
     finally:
         if connection.is_connected():
             connection.close()
-
+            
+#Retrieve all songs from the database
 def get_all_songs():
-    """Retrieve all songs from the database"""
     connection = get_db_connection()
     if not connection:
         return []
@@ -617,9 +591,9 @@ def get_all_songs():
     finally:
         if connection.is_connected():
             connection.close()
-
+            
+#Retrieve all artists from the database, excluding those with only blacklisted listens
 def get_all_artists():
-    """Retrieve all artists from the database, excluding those with only blacklisted listens"""
     connection = get_db_connection()
     if not connection:
         return []
@@ -666,8 +640,8 @@ def get_all_artists():
         if connection.is_connected():
             connection.close()
 
+#Retrieve all albums from the database, excluding those with only blacklisted listens
 def get_all_albums():
-    """Retrieve all albums from the database, excluding those with only blacklisted listens"""
     connection = get_db_connection()
     if not connection:
         return []
@@ -684,7 +658,7 @@ def get_all_albums():
         """)
         has_image_url = cursor.fetchone()['COUNT(*)'] > 0
         
-        # Filter out albums with zero non-blacklisted listens (checking A_Listen_Time since A_Listens is for complete album plays)
+        # Filter out albums with zero non-blacklisted listens 
         if has_image_url:
             cursor.execute("""
                 SELECT al.A_ID as id, al.A_Title as title, al.A_Listen_Time as listen_time_ms, 
@@ -714,8 +688,8 @@ def get_all_albums():
         if connection.is_connected():
             connection.close()
 
+    #Get existing user or create new user, returns U_ID
 def get_or_create_user(spotify_user_id, username):
-    """Get existing user or create new user, returns U_ID"""
     connection = get_db_connection()
     if not connection:
         return None
@@ -723,14 +697,12 @@ def get_or_create_user(spotify_user_id, username):
     try:
         cursor = connection.cursor()
         
-        # Try to find user by username (since we don't store Spotify ID in schema)
         cursor.execute("SELECT U_ID FROM Users WHERE U_Username = %s", (username[:20],))
         result = cursor.fetchone()
         
         if result:
             user_id = result[0]
         else:
-            # Insert new user
             cursor.execute("INSERT INTO Users (U_Username) VALUES (%s)", (username[:20],))
             connection.commit()
             user_id = cursor.lastrowid
@@ -743,9 +715,9 @@ def get_or_create_user(spotify_user_id, username):
     finally:
         if connection.is_connected():
             connection.close()
-
+            
+#Get all playlists for a user
 def get_user_playlists(user_id):
-    """Get all playlists for a user"""
     connection = get_db_connection()
     if not connection:
         return []
@@ -766,9 +738,8 @@ def get_user_playlists(user_id):
     finally:
         if connection.is_connected():
             connection.close()
-
+#Insert or update a playlist
 def insert_or_update_playlist(playlist_id, playlist_name, user_id):
-    """Insert or update a playlist"""
     connection = get_db_connection()
     if not connection:
         return False
@@ -804,8 +775,8 @@ def insert_or_update_playlist(playlist_id, playlist_name, user_id):
         if connection.is_connected():
             connection.close()
 
+#Link a song to a playlist
 def link_playlist_song(playlist_id, song_id):
-    """Link a song to a playlist"""
     connection = get_db_connection()
     if not connection:
         return False
@@ -826,8 +797,8 @@ def link_playlist_song(playlist_id, song_id):
         if connection.is_connected():
             connection.close()
 
+    #Get the timestamp of the last sync from a tracking file
 def get_last_sync_timestamp():
-    """Get the timestamp of the last sync from a tracking file"""
     try:
         if os.path.exists('last_sync.txt'):
             with open('last_sync.txt', 'r') as f:
@@ -837,9 +808,8 @@ def get_last_sync_timestamp():
     except Exception as e:
         print(f"Error reading last sync timestamp: {e}")
     return None
-
+#Save the timestamp of the last successful sync
 def save_last_sync_timestamp(timestamp):
-    """Save the timestamp of the last successful sync"""
     try:
         with open('last_sync.txt', 'w') as f:
             f.write(timestamp)
@@ -860,17 +830,15 @@ def get_blacklist():
     except Exception as e:
         print(f"Error reading blacklist: {e}")
     return []
-
+#Save the blacklist to persistent storage
 def save_blacklist(blacklist):
-    """Save the blacklist to persistent storage"""
     try:
         with open('blacklist.json', 'w', encoding='utf-8') as f:
             json.dump(blacklist, f, indent=2, ensure_ascii=False)
     except Exception as e:
         print(f"Error saving blacklist: {e}")
-
+#Add a playlist to the blacklist
 def add_to_blacklist(playlist_id, playlist_name, image_url=None):
-    """Add a playlist to the blacklist"""
     blacklist = get_blacklist()
     # Avoid duplicates
     if not any(p['id'] == playlist_id for p in blacklist):
@@ -882,24 +850,20 @@ def add_to_blacklist(playlist_id, playlist_name, image_url=None):
         save_blacklist(blacklist)
         return True
     return False
-
+#Remove a playlist from the blacklist
 def remove_from_blacklist(playlist_id):
-    """Remove a playlist from the blacklist"""
     blacklist = get_blacklist()
     blacklist = [p for p in blacklist if p['id'] != playlist_id]
     save_blacklist(blacklist)
     return True
-
+#Check if a specific play (song + timestamp) has already been processed
 def check_if_play_exists(song_id, played_at_timestamp):
-    """Check if a specific play (song + timestamp) has already been processed"""
     connection = get_db_connection()
     if not connection:
         return False
     
     try:
         cursor = connection.cursor()
-        # We'll use a simple heuristic: if the song exists, we've likely processed recent plays
-        # For a more robust solution, we'd need a play_history table with timestamps
         cursor.execute("SELECT S_ID FROM Songs WHERE S_ID = %s", (song_id,))
         result = cursor.fetchone()
         cursor.close()

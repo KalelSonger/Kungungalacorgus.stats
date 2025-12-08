@@ -1203,17 +1203,19 @@ def database_values():
             document.getElementById(tabName).style.display = "block";
             evt.currentTarget.className += " active";
             
-            // Sort the tab on first open
+            // Sort the tab on first open based on the dropdown's current value
             if (!openedTabs[tabName]) {{
                 openedTabs[tabName] = true;
                 
-                // Sort each tab by its default sort option
                 if (tabName === 'TopSongs') {{
-                    sortCards('TopSongs', 'listens');
+                    var songSortBy = document.getElementById('songSort').value;
+                    sortCards('TopSongs', songSortBy);
                 }} else if (tabName === 'TopArtists') {{
-                    sortCards('TopArtists', 'listens');
+                    var artistSortBy = document.getElementById('artistSort').value;
+                    sortCards('TopArtists', artistSortBy);
                 }} else if (tabName === 'TopAlbums') {{
-                    sortCards('TopAlbums', 'time');
+                    var albumSortBy = document.getElementById('albumSort').value;
+                    sortCards('TopAlbums', albumSortBy);
                 }}
             }}
         }}
@@ -1236,16 +1238,22 @@ def database_values():
             cards.sort(function(a, b) {{
                 var aValue, bValue;
                 
-                if (sortBy === 'listens' || sortBy === 'plays') {{
-                    // Find the stat-value that's NOT a time-value (that's the listens/plays count)
-                    var aStats = a.querySelectorAll('.stat-value');
-                    var bStats = b.querySelectorAll('.stat-value');
-                    aValue = parseInt(aStats[0].textContent);
-                    bValue = parseInt(bStats[0].textContent);
+                if (sortBy === 'listens') {{
+                    // Find all stat-box elements that are NOT blacklisted-stats
+                    var aStatBoxes = a.querySelectorAll('.stat-box:not(.blacklisted-stats)');
+                    var bStatBoxes = b.querySelectorAll('.stat-box:not(.blacklisted-stats)');
+                    // First stat-box is the listens count
+                    aValue = parseInt(aStatBoxes[0].querySelector('.stat-value').textContent);
+                    bValue = parseInt(bStatBoxes[0].querySelector('.stat-value').textContent);
                 }} else if (sortBy === 'time') {{
-                    // Find the time-value element and use its data-ms attribute
-                    aValue = parseInt(a.querySelector('.time-value').getAttribute('data-ms'));
-                    bValue = parseInt(b.querySelector('.time-value').getAttribute('data-ms'));
+                    // Find all stat-box elements that are NOT blacklisted-stats
+                    var aStatBoxes = a.querySelectorAll('.stat-box:not(.blacklisted-stats)');
+                    var bStatBoxes = b.querySelectorAll('.stat-box:not(.blacklisted-stats)');
+                    // Second stat-box is the time
+                    var aTimeElement = aStatBoxes[1].querySelector('.time-value');
+                    var bTimeElement = bStatBoxes[1].querySelector('.time-value');
+                    aValue = parseInt(aTimeElement.getAttribute('data-ms'));
+                    bValue = parseInt(bTimeElement.getAttribute('data-ms'));
                 }}
                 
                 return bValue - aValue; // Descending order
