@@ -77,6 +77,30 @@ def insert_or_update_song(song_data):
             connection.commit()
             print("✓ Added image_url column to Songs table")
         
+        # Add S_Blacklisted_Listens column if it doesn't exist
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = 'spotifyDatabase' 
+            AND TABLE_NAME = 'Songs' 
+            AND COLUMN_NAME = 'S_Blacklisted_Listens'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("ALTER TABLE Songs ADD COLUMN S_Blacklisted_Listens INT DEFAULT 0")
+            connection.commit()
+            print("✓ Added S_Blacklisted_Listens column to Songs table")
+        
+        # Add S_Blacklisted_Time column if it doesn't exist
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = 'spotifyDatabase' 
+            AND TABLE_NAME = 'Songs' 
+            AND COLUMN_NAME = 'S_Blacklisted_Time'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("ALTER TABLE Songs ADD COLUMN S_Blacklisted_Time BIGINT DEFAULT 0")
+            connection.commit()
+            print("✓ Added S_Blacklisted_Time column to Songs table")
+        
         # Convert played_at to MySQL datetime format if it exists
         played_at = song_data.get('played_at')
         if played_at and hasattr(played_at, 'strftime'):
@@ -85,29 +109,44 @@ def insert_or_update_song(song_data):
             played_at_str = None
         
         # Check if song exists
-        cursor.execute("SELECT S_Listens, S_Listen_Time FROM Songs WHERE S_ID = %s", (song_data['id'],))
+        cursor.execute("SELECT S_Listens, S_Listen_Time, S_Blacklisted_Listens, S_Blacklisted_Time FROM Songs WHERE S_ID = %s", (song_data['id'],))
         result = cursor.fetchone()
         
+        is_blacklisted = song_data.get('is_blacklisted', False)
+        
         if result:
-            # Update existing song - increment listens and update last_played
-            new_listen_count = result[0] + 1
-            new_listen_time = result[1] + song_data['length_ms']
+            # Update existing song - increment appropriate counters
+            new_listen_count = result[0] + (0 if is_blacklisted else 1)
+            new_listen_time = result[1] + (0 if is_blacklisted else song_data['length_ms'])
+            new_blacklisted_listens = result[2] + (1 if is_blacklisted else 0)
+            new_blacklisted_time = result[3] + (song_data['length_ms'] if is_blacklisted else 0)
+            
             cursor.execute("""
                 UPDATE Songs 
-                SET S_Listens = %s, S_Listen_Time = %s, last_played = %s, image_url = %s, flag = 1
+                SET S_Listens = %s, S_Listen_Time = %s, S_Blacklisted_Listens = %s, S_Blacklisted_Time = %s, 
+                    last_played = %s, image_url = %s, flag = 1
                 WHERE S_ID = %s
-            """, (new_listen_count, new_listen_time, played_at_str, song_data.get('image_url'), song_data['id']))
+            """, (new_listen_count, new_listen_time, new_blacklisted_listens, new_blacklisted_time,
+                  played_at_str, song_data.get('image_url'), song_data['id']))
         else:
             # Insert new song
+            initial_listens = 0 if is_blacklisted else 1
+            initial_time = 0 if is_blacklisted else song_data['length_ms']
+            initial_blacklisted_listens = 1 if is_blacklisted else 0
+            initial_blacklisted_time = song_data['length_ms'] if is_blacklisted else 0
+            
             cursor.execute("""
-                INSERT INTO Songs (S_ID, S_Title, S_Length, S_Listens, S_Listen_Time, last_played, image_url, flag)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO Songs (S_ID, S_Title, S_Length, S_Listens, S_Listen_Time, S_Blacklisted_Listens, 
+                                   S_Blacklisted_Time, last_played, image_url, flag)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 song_data['id'],
                 song_data['title'][:50],  # Limit to 50 chars per schema
                 song_data['length_ms'],
-                1,
-                song_data['length_ms'],
+                initial_listens,
+                initial_time,
+                initial_blacklisted_listens,
+                initial_blacklisted_time,
                 played_at_str,
                 song_data.get('image_url'),
                 1
@@ -123,7 +162,7 @@ def insert_or_update_song(song_data):
         if connection.is_connected():
             connection.close()
 
-def insert_or_update_artist(artist_id, artist_name, song_length_ms, image_url=None):
+def insert_or_update_artist(artist_id, artist_name, song_length_ms, image_url=None, is_blacklisted=False):
     """Insert a new artist or update existing artist's stats"""
     connection = get_db_connection()
     if not connection:
@@ -144,25 +183,60 @@ def insert_or_update_artist(artist_id, artist_name, song_length_ms, image_url=No
             connection.commit()
             print("✓ Added image_url column to Artists table")
         
+        # Add A_Blacklisted_Listens column if it doesn't exist
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = 'spotifyDatabase' 
+            AND TABLE_NAME = 'Artists' 
+            AND COLUMN_NAME = 'A_Blacklisted_Listens'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("ALTER TABLE Artists ADD COLUMN A_Blacklisted_Listens INT DEFAULT 0")
+            connection.commit()
+            print("✓ Added A_Blacklisted_Listens column to Artists table")
+        
+        # Add A_Blacklisted_Time column if it doesn't exist
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = 'spotifyDatabase' 
+            AND TABLE_NAME = 'Artists' 
+            AND COLUMN_NAME = 'A_Blacklisted_Time'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("ALTER TABLE Artists ADD COLUMN A_Blacklisted_Time BIGINT DEFAULT 0")
+            connection.commit()
+            print("✓ Added A_Blacklisted_Time column to Artists table")
+        
         # Check if artist exists
-        cursor.execute("SELECT A_Listens, A_ListenTime FROM Artists WHERE A_ID = %s", (artist_id,))
+        cursor.execute("SELECT A_Listens, A_ListenTime, A_Blacklisted_Listens, A_Blacklisted_Time FROM Artists WHERE A_ID = %s", (artist_id,))
         result = cursor.fetchone()
         
         if result:
             # Update existing artist
-            new_listens = result[0] + 1
-            new_listen_time = result[1] + song_length_ms
+            new_listens = result[0] + (0 if is_blacklisted else 1)
+            new_listen_time = result[1] + (0 if is_blacklisted else song_length_ms)
+            new_blacklisted_listens = result[2] + (1 if is_blacklisted else 0)
+            new_blacklisted_time = result[3] + (song_length_ms if is_blacklisted else 0)
+            
             cursor.execute("""
                 UPDATE Artists 
-                SET A_Listens = %s, A_ListenTime = %s, image_url = %s, flag = 1
+                SET A_Listens = %s, A_ListenTime = %s, A_Blacklisted_Listens = %s, A_Blacklisted_Time = %s, 
+                    image_url = %s, flag = 1
                 WHERE A_ID = %s
-            """, (new_listens, new_listen_time, image_url, artist_id))
+            """, (new_listens, new_listen_time, new_blacklisted_listens, new_blacklisted_time, image_url, artist_id))
         else:
             # Insert new artist
+            initial_listens = 0 if is_blacklisted else 1
+            initial_time = 0 if is_blacklisted else song_length_ms
+            initial_blacklisted_listens = 1 if is_blacklisted else 0
+            initial_blacklisted_time = song_length_ms if is_blacklisted else 0
+            
             cursor.execute("""
-                INSERT INTO Artists (A_ID, A_Name, A_Listens, A_ListenTime, image_url, flag)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (artist_id, artist_name[:50], 1, song_length_ms, image_url, 1))
+                INSERT INTO Artists (A_ID, A_Name, A_Listens, A_ListenTime, A_Blacklisted_Listens, 
+                                     A_Blacklisted_Time, image_url, flag)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (artist_id, artist_name[:50], initial_listens, initial_time, 
+                  initial_blacklisted_listens, initial_blacklisted_time, image_url, 1))
         
         connection.commit()
         cursor.close()
@@ -219,7 +293,7 @@ def link_album_song(album_id, song_id):
         if connection.is_connected():
             connection.close()
 
-def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms, song_length_ms, image_url=None):
+def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms, song_length_ms, image_url=None, is_blacklisted=False):
     """Insert a new album or update existing album's stats
     Note: A_Listens will be calculated as MIN(song listens) only if ALL tracks have been listened to"""
     connection = get_db_connection()
@@ -253,14 +327,40 @@ def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms,
             connection.commit()
             print("✓ Added image_url column to Albums table")
         
+        # Add A_Blacklisted_Listens column if it doesn't exist
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = 'spotifyDatabase' 
+            AND TABLE_NAME = 'Albums' 
+            AND COLUMN_NAME = 'A_Blacklisted_Listens'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("ALTER TABLE Albums ADD COLUMN A_Blacklisted_Listens INT DEFAULT 0")
+            connection.commit()
+            print("✓ Added A_Blacklisted_Listens column to Albums table")
+        
+        # Add A_Blacklisted_Time column if it doesn't exist
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = 'spotifyDatabase' 
+            AND TABLE_NAME = 'Albums' 
+            AND COLUMN_NAME = 'A_Blacklisted_Time'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("ALTER TABLE Albums ADD COLUMN A_Blacklisted_Time BIGINT DEFAULT 0")
+            connection.commit()
+            print("✓ Added A_Blacklisted_Time column to Albums table")
+        
         # Check if album exists
-        cursor.execute("SELECT A_Listen_Time, total_tracks FROM Albums WHERE A_ID = %s", (album_id,))
+        cursor.execute("SELECT A_Listen_Time, total_tracks, A_Blacklisted_Listens, A_Blacklisted_Time FROM Albums WHERE A_ID = %s", (album_id,))
         result = cursor.fetchone()
         
         if result:
             # Update existing album
-            new_listen_time = result[0] + song_length_ms
+            new_listen_time = result[0] + (0 if is_blacklisted else song_length_ms)
             stored_total_tracks = result[1] if result[1] else total_tracks
+            new_blacklisted_listens = result[2] + (1 if is_blacklisted else 0)
+            new_blacklisted_time = result[3] + (song_length_ms if is_blacklisted else 0)
             
             # Calculate complete album listens:
             # Check if user has listened to ALL tracks in the album
@@ -289,15 +389,25 @@ def insert_or_update_album(album_id, album_title, total_tracks, album_length_ms,
             
             cursor.execute("""
                 UPDATE Albums 
-                SET A_Listen_Time = %s, A_Listens = %s, total_tracks = %s, image_url = %s, flag = 1
+                SET A_Listen_Time = %s, A_Listens = %s, A_Blacklisted_Listens = %s, A_Blacklisted_Time = %s,
+                    total_tracks = %s, image_url = %s, flag = 1
                 WHERE A_ID = %s
-            """, (new_listen_time, complete_listens, stored_total_tracks, image_url, album_id))
+            """, (new_listen_time, complete_listens, new_blacklisted_listens, new_blacklisted_time,
+                  stored_total_tracks, image_url, album_id))
         else:
             # Insert new album with 0 listens initially
+            initial_listens = 0
+            initial_time = 0 if is_blacklisted else song_length_ms
+            initial_blacklisted_listens = 1 if is_blacklisted else 0
+            initial_blacklisted_time = song_length_ms if is_blacklisted else 0
+            
             cursor.execute("""
-                INSERT INTO Albums (A_ID, A_Title, A_Listen_Time, A_Listens, A_Length, total_tracks, image_url, flag)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (album_id, album_title[:50], song_length_ms, 0, album_length_ms, total_tracks, image_url, 1))
+                INSERT INTO Albums (A_ID, A_Title, A_Listen_Time, A_Listens, A_Blacklisted_Listens,
+                                    A_Blacklisted_Time, A_Length, total_tracks, image_url, flag)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (album_id, album_title[:50], initial_time, initial_listens, 
+                  initial_blacklisted_listens, initial_blacklisted_time,
+                  album_length_ms, total_tracks, image_url, 1))
         
         connection.commit()
         cursor.close()
@@ -341,6 +451,7 @@ def get_all_songs():
             cursor.execute("""
                 SELECT S_ID as id, S_Title as title, S_Length as length_ms, 
                        S_Listens as listen_count, S_Listen_Time as listen_time_ms,
+                       S_Blacklisted_Listens as blacklisted_listens, S_Blacklisted_Time as blacklisted_time_ms,
                        last_played, image_url, '' as artists, '' as album_title
                 FROM Songs
                 WHERE flag = 1
@@ -350,6 +461,7 @@ def get_all_songs():
             cursor.execute("""
                 SELECT S_ID as id, S_Title as title, S_Length as length_ms, 
                        S_Listens as listen_count, S_Listen_Time as listen_time_ms,
+                       S_Blacklisted_Listens as blacklisted_listens, S_Blacklisted_Time as blacklisted_time_ms,
                        last_played, NULL as image_url, '' as artists, '' as album_title
                 FROM Songs
                 WHERE flag = 1
@@ -359,6 +471,7 @@ def get_all_songs():
             cursor.execute("""
                 SELECT S_ID as id, S_Title as title, S_Length as length_ms, 
                        S_Listens as listen_count, S_Listen_Time as listen_time_ms,
+                       S_Blacklisted_Listens as blacklisted_listens, S_Blacklisted_Time as blacklisted_time_ms,
                        NULL as last_played, image_url, '' as artists, '' as album_title
                 FROM Songs
                 WHERE flag = 1
@@ -368,6 +481,7 @@ def get_all_songs():
             cursor.execute("""
                 SELECT S_ID as id, S_Title as title, S_Length as length_ms, 
                        S_Listens as listen_count, S_Listen_Time as listen_time_ms,
+                       S_Blacklisted_Listens as blacklisted_listens, S_Blacklisted_Time as blacklisted_time_ms,
                        NULL as last_played, NULL as image_url, '' as artists, '' as album_title
                 FROM Songs
                 WHERE flag = 1
@@ -408,7 +522,7 @@ def get_all_songs():
             connection.close()
 
 def get_all_artists():
-    """Retrieve all artists from the database"""
+    """Retrieve all artists from the database, excluding those with only blacklisted listens"""
     connection = get_db_connection()
     if not connection:
         return []
@@ -425,22 +539,26 @@ def get_all_artists():
         """)
         has_image_url = cursor.fetchone()['COUNT(*)'] > 0
         
+        # Filter out artists with zero non-blacklisted listens
         if has_image_url:
             cursor.execute("""
-                SELECT A_ID as id, A_Name as name, A_Listens as listens, 
-                       A_ListenTime as listen_time_ms, image_url
-                FROM Artists
-                WHERE flag = 1
-                ORDER BY A_Listens DESC
+                SELECT a.A_ID as id, a.A_Name as name, a.A_Listens as listens, 
+                       a.A_ListenTime as listen_time_ms, a.A_Blacklisted_Listens as blacklisted_listens,
+                       a.A_Blacklisted_Time as blacklisted_time_ms, a.image_url
+                FROM Artists a
+                WHERE a.flag = 1 AND a.A_Listens > 0
+                ORDER BY a.A_Listens DESC
             """)
         else:
             cursor.execute("""
-                SELECT A_ID as id, A_Name as name, A_Listens as listens, 
-                       A_ListenTime as listen_time_ms, NULL as image_url
-                FROM Artists
-                WHERE flag = 1
-                ORDER BY A_Listens DESC
+                SELECT a.A_ID as id, a.A_Name as name, a.A_Listens as listens, 
+                       a.A_ListenTime as listen_time_ms, a.A_Blacklisted_Listens as blacklisted_listens,
+                       a.A_Blacklisted_Time as blacklisted_time_ms, NULL as image_url
+                FROM Artists a
+                WHERE a.flag = 1 AND a.A_Listens > 0
+                ORDER BY a.A_Listens DESC
             """)
+            
         artists = cursor.fetchall()
         cursor.close()
         return artists
@@ -452,7 +570,7 @@ def get_all_artists():
             connection.close()
 
 def get_all_albums():
-    """Retrieve all albums from the database"""
+    """Retrieve all albums from the database, excluding those with only blacklisted listens"""
     connection = get_db_connection()
     if not connection:
         return []
@@ -469,22 +587,26 @@ def get_all_albums():
         """)
         has_image_url = cursor.fetchone()['COUNT(*)'] > 0
         
+        # Filter out albums with zero non-blacklisted listens (checking A_Listen_Time since A_Listens is for complete album plays)
         if has_image_url:
             cursor.execute("""
-                SELECT A_ID as id, A_Title as title, A_Listen_Time as listen_time_ms, 
-                       A_Listens as listens, A_Length as length_ms, image_url
-                FROM Albums
-                WHERE flag = 1
-                ORDER BY A_Listens DESC
+                SELECT al.A_ID as id, al.A_Title as title, al.A_Listen_Time as listen_time_ms, 
+                       al.A_Listens as listens, al.A_Length as length_ms, al.A_Blacklisted_Listens as blacklisted_listens,
+                       al.A_Blacklisted_Time as blacklisted_time_ms, al.image_url
+                FROM Albums al
+                WHERE al.flag = 1 AND al.A_Listen_Time > 0
+                ORDER BY al.A_Listens DESC
             """)
         else:
             cursor.execute("""
-                SELECT A_ID as id, A_Title as title, A_Listen_Time as listen_time_ms, 
-                       A_Listens as listens, A_Length as length_ms, NULL as image_url
-                FROM Albums
-                WHERE flag = 1
-                ORDER BY A_Listens DESC
+                SELECT al.A_ID as id, al.A_Title as title, al.A_Listen_Time as listen_time_ms, 
+                       al.A_Listens as listens, al.A_Length as length_ms, al.A_Blacklisted_Listens as blacklisted_listens,
+                       al.A_Blacklisted_Time as blacklisted_time_ms, NULL as image_url
+                FROM Albums al
+                WHERE al.flag = 1 AND al.A_Listen_Time > 0
+                ORDER BY al.A_Listens DESC
             """)
+            
         albums = cursor.fetchall()
         cursor.close()
         return albums

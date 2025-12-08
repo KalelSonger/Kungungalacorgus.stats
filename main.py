@@ -137,6 +137,19 @@ def sync_recent_plays_background():
         last_sync = get_last_sync_timestamp()
         
         headers = {'Authorization': f"Bearer {access_token}"}
+        
+        # First, try to get currently playing track to capture its context
+        current_response = requests.get(API_BASE_URL + '/me/player/currently-playing', headers=headers)
+        current_context = None
+        if current_response.status_code == 200 and current_response.text:
+            current_data = current_response.json()
+            if current_data.get('item') and current_data.get('context'):
+                current_context = {
+                    'track_id': current_data['item']['id'],
+                    'context': current_data.get('context')
+                }
+        
+        # Get recently played tracks
         response = requests.get(API_BASE_URL + '/me/player/recently-played?limit=50', headers=headers)
         
         if response.status_code == 200:
@@ -162,7 +175,15 @@ def sync_recent_plays_background():
                 for item in new_plays:
                     track = item['track']
                     played_at = datetime.fromisoformat(item['played_at'].replace('Z', '+00:00'))
-                    process_and_store_track(track, played_at, access_token)
+                    
+                    # Try to use current context if this is the currently playing track
+                    context = None
+                    if current_context and track['id'] == current_context['track_id']:
+                        context = current_context['context']
+                    # Note: For historical plays, we won't have context, so they won't be marked as blacklisted
+                    # Only real-time plays will have accurate blacklist tracking
+                    
+                    process_and_store_track(track, played_at, access_token, context)
                 
                 # Save the latest timestamp
                 save_last_sync_timestamp(latest_timestamp)
@@ -175,9 +196,28 @@ def sync_recent_plays_background():
 # Schedule background sync every 2 minutes
 scheduler.add_job(func=sync_recent_plays_background, trigger="interval", minutes=2, id='sync_job')
 
-def process_and_store_track(track, played_at, access_token):
-    """Process a track and store it in the database with all related data"""
+def process_and_store_track(track, played_at, access_token, context=None):
+    """Process a track and store it in the database with all related data
+    
+    Args:
+        track: The track data from Spotify API
+        played_at: Datetime when the track was played
+        access_token: Spotify API access token
+        context: Optional context dict containing 'type' and 'uri' of playback source
+    """
     try:
+        # Determine if this play is from a blacklisted playlist
+        is_blacklisted = False
+        if context and context.get('type') == 'playlist':
+            playlist_uri = context.get('uri', '')
+            # Extract playlist ID from URI (spotify:playlist:ID)
+            playlist_id = playlist_uri.split(':')[-1] if playlist_uri else None
+            
+            if playlist_id:
+                blacklist = get_blacklist()
+                is_blacklisted = any(p['id'] == playlist_id for p in blacklist)
+                if is_blacklisted:
+                    print(f"  🚫 Blacklisted playlist detected: {playlist_id}")
         print(f"\n[Processing] {track['name']} by {', '.join([a['name'] for a in track['artists']])}")
         
         # Prepare song data
@@ -186,9 +226,9 @@ def process_and_store_track(track, played_at, access_token):
             'title': track['name'],
             'length_ms': track['duration_ms'],
             'played_at': played_at,
-            'image_url': track['album']['images'][0]['url'] if track['album'].get('images') else None
+            'image_url': track['album']['images'][0]['url'] if track['album'].get('images') else None,
+            'is_blacklisted': is_blacklisted
         }
-        print(f"  📷 Song image URL: {song_data.get('image_url', 'None')[:50] if song_data.get('image_url') else 'None'}")
         
         # Insert/update song
         if not insert_or_update_song(song_data):
@@ -209,7 +249,6 @@ def process_and_store_track(track, played_at, access_token):
             total_tracks = album_full.get('total_tracks', 0)
             album_length_ms = sum(t['duration_ms'] for t in album_full.get('tracks', {}).get('items', []))
             album_image_url = album_full['images'][0]['url'] if album_full.get('images') else None
-            print(f"  📷 Album image URL: {album_image_url[:50] if album_image_url else 'None'}")
             
             if not insert_or_update_album(
                 album_id,
@@ -217,7 +256,8 @@ def process_and_store_track(track, played_at, access_token):
                 total_tracks,
                 album_length_ms,
                 track['duration_ms'],
-                album_image_url
+                album_image_url,
+                is_blacklisted
             ):
                 print(f"  ⚠ Failed to insert album: {album_title}")
                 return
@@ -238,10 +278,9 @@ def process_and_store_track(track, played_at, access_token):
             if artist_response.status_code == 200:
                 artist_full = artist_response.json()
                 artist_image_url = artist_full['images'][0]['url'] if artist_full.get('images') else None
-            print(f"  📷 Artist image URL: {artist_image_url[:50] if artist_image_url else 'None'}")
             
             # Insert/update artist
-            if not insert_or_update_artist(artist_id, artist_name, track['duration_ms'], artist_image_url):
+            if not insert_or_update_artist(artist_id, artist_name, track['duration_ms'], artist_image_url, is_blacklisted):
                 print(f"  ⚠ Failed to insert artist: {artist_name}")
             else:
                 print(f"  ✓ Artist inserted/updated: {artist_name}")
@@ -266,7 +305,70 @@ API_BASE_URL = 'https://api.spotify.com/v1'
 
 @app.route('/')
 def index():
-    return f"Welcome to Kungungalcorgus.stats " + "<a href='/login'>Login with Spotify</a>"
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Kungungalacorgus.stats</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                background-color: #121212;
+                color: #FFFFFF;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                flex-direction: column;
+            }
+            h1 {
+                font-size: 48px;
+                font-weight: bold;
+                margin-bottom: 10px;
+                text-align: center;
+                color: #1DB954;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            }
+            .subtitle {
+                font-size: 18px;
+                color: #FFFFFF;
+                margin-bottom: 30px;
+                text-align: center;
+                opacity: 1;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            }
+            .login-button {
+                padding: 15px 40px;
+                background-color: #1DB954;
+                color: white;
+                border: none;
+                border-radius: 30px;
+                font-size: 18px;
+                font-weight: bold;
+                cursor: pointer;
+                text-decoration: none;
+                display: inline-block;
+                transition: background-color 0.3s, transform 0.1s;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            }
+            .login-button:hover {
+                background-color: #1ed760;
+                transform: scale(1.05);
+            }
+            .login-button:active {
+                transform: scale(0.98);
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Welcome to Kungungalacorgus.stats!</h1>
+        <p class="subtitle">Login to see your stats</p>
+        <a href="/login" class="login-button">Login to Spotify</a>
+    </body>
+    </html>
+    """
 
 @app.route('/login')
 def login():
@@ -401,11 +503,11 @@ def sync_recent():
 def add_to_blacklist_route():
     """Add a playlist to the blacklist"""
     if 'access_token' not in session:
-        return redirect('/login')
+        return jsonify({'success': False, 'error': 'Not logged in'})
     
     playlist_url = request.form.get('playlist_url', '').strip()
     if not playlist_url:
-        return redirect('/database_values')
+        return jsonify({'success': False, 'error': 'No playlist URL provided'})
     
     # Extract playlist ID from URL (supports various Spotify URL formats)
     playlist_id = None
@@ -430,19 +532,34 @@ def add_to_blacklist_route():
                 
                 # Add to persistent blacklist with image URL
                 add_to_blacklist(playlist_id, playlist_name, image_url)
+                
+                return jsonify({
+                    'success': True,
+                    'playlist': {
+                        'id': playlist_id,
+                        'name': playlist_name,
+                        'image_url': image_url
+                    }
+                })
+            else:
+                return jsonify({'success': False, 'error': 'Could not fetch playlist from Spotify'})
         except Exception as e:
             print(f"Error adding playlist to blacklist: {e}")
+            return jsonify({'success': False, 'error': str(e)})
     
-    return redirect('/database_values')
+    return jsonify({'success': False, 'error': 'Invalid playlist URL'})
 
 @app.route('/remove_from_blacklist/<playlist_id>')
 def remove_from_blacklist_route(playlist_id):
     """Remove a playlist from the blacklist"""
     if 'access_token' not in session:
-        return redirect('/login')
+        return jsonify({'success': False, 'error': 'Not logged in'})
     
-    remove_from_blacklist(playlist_id)
-    return redirect('/database_values')
+    try:
+        remove_from_blacklist(playlist_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/database_values')
 def database_values():
@@ -527,6 +644,9 @@ def database_values():
             'listen_count': song['listen_count'],
             'listen_time_ms': song['listen_time_ms'],
             'listen_time_formatted': f"{song['listen_time_ms'] // 60000}:{(song['listen_time_ms'] % 60000) // 1000:02d}",
+            'blacklisted_listens': song.get('blacklisted_listens', 0),
+            'blacklisted_time_ms': song.get('blacklisted_time_ms', 0),
+            'blacklisted_time_formatted': f"{song.get('blacklisted_time_ms', 0) // 60000}:{(song.get('blacklisted_time_ms', 0) % 60000) // 1000:02d}",
             'image_url': song.get('image_url')
         })
     
@@ -539,6 +659,9 @@ def database_values():
             'listens': artist['listens'],
             'listen_time_ms': artist['listen_time_ms'],
             'listen_time_formatted': f"{artist['listen_time_ms'] // 60000}:{(artist['listen_time_ms'] % 60000) // 1000:02d}",
+            'blacklisted_listens': artist.get('blacklisted_listens', 0),
+            'blacklisted_time_ms': artist.get('blacklisted_time_ms', 0),
+            'blacklisted_time_formatted': f"{artist.get('blacklisted_time_ms', 0) // 60000}:{(artist.get('blacklisted_time_ms', 0) % 60000) // 1000:02d}",
             'image_url': artist.get('image_url')
         })
     
@@ -553,6 +676,9 @@ def database_values():
             'listens': album['listens'],
             'length_ms': album['length_ms'],
             'length_formatted': f"{album['length_ms'] // 60000}:{(album['length_ms'] % 60000) // 1000:02d}",
+            'blacklisted_listens': album.get('blacklisted_listens', 0),
+            'blacklisted_time_ms': album.get('blacklisted_time_ms', 0),
+            'blacklisted_time_formatted': f"{album.get('blacklisted_time_ms', 0) // 60000}:{(album.get('blacklisted_time_ms', 0) % 60000) // 1000:02d}",
             'image_url': album.get('image_url')
         })
     
@@ -734,13 +860,17 @@ def database_values():
             font-weight: bold;
         }}
         .time-format-wrapper {{
-            position: absolute;
-            top: 70px;
-            right: 20px;
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            z-index: 1000;
+            gap: 10px;
+            padding: 10px;
+            background-color: #1e1e1e;
+            border-radius: 5px;
             font-size: 14px;
+            transition: background-color 0.3s;
+        }}
+        body.light-mode .time-format-wrapper {{
+            background-color: #f5f5f5;
         }}
         .time-format-switch {{
             display: inline-block;
@@ -822,6 +952,7 @@ def database_values():
         }}
         .stat-box {{
             text-align: center;
+            min-width: 80px;
         }}
         .stat-value {{
             font-size: 20px;
@@ -888,20 +1019,56 @@ def database_values():
         }}
         
         // Time format toggle function
-        function toggleTimeFormat() {{
-            var isExtended = document.getElementById('time-format-toggle').checked;
+        function toggleTimeFormat(sourceId) {{
+            // If sourceId not provided, default to first toggle
+            if (!sourceId) sourceId = 'time-format-toggle';
+            
+            var isExtended = document.getElementById(sourceId).checked;
             localStorage.setItem('timeFormat', isExtended ? 'extended' : 'compact');
+            
+            // Sync all toggle switches
+            var toggles = ['time-format-toggle', 'time-format-toggle-artists', 'time-format-toggle-albums', 'time-format-toggle-stats'];
+            toggles.forEach(function(id) {{
+                var el = document.getElementById(id);
+                if (el) el.checked = isExtended;
+            }});
+            
             updateTimeDisplays(isExtended);
         }}
         
         // Load saved time format preference
         function loadTimeFormat() {{
             var savedFormat = localStorage.getItem('timeFormat');
-            if (savedFormat === 'extended') {{
-                document.getElementById('time-format-toggle').checked = true;
-                updateTimeDisplays(true);
-            }} else {{
-                updateTimeDisplays(false);
+            var isExtended = savedFormat === 'extended';
+            
+            // Set all toggle switches
+            var toggles = ['time-format-toggle', 'time-format-toggle-artists', 'time-format-toggle-albums', 'time-format-toggle-stats'];
+            toggles.forEach(function(id) {{
+                var el = document.getElementById(id);
+                if (el) el.checked = isExtended;
+            }});
+            
+            updateTimeDisplays(isExtended);
+        }}
+        
+        // Toggle blacklisted columns visibility
+        function toggleBlacklistedColumns() {{
+            var showBlacklisted = document.getElementById('blacklist-toggle').checked;
+            localStorage.setItem('showBlacklisted', showBlacklisted ? 'true' : 'false');
+            
+            var blacklistedColumns = document.querySelectorAll('.blacklisted-column');
+            blacklistedColumns.forEach(function(column) {{
+                column.style.display = showBlacklisted ? '' : 'none';
+            }});
+        }}
+        
+        // Load saved blacklisted column preference
+        function loadBlacklistedPreference() {{
+            var showBlacklisted = localStorage.getItem('showBlacklisted') === 'true';
+            var toggle = document.getElementById('blacklist-toggle');
+            if (toggle) {{
+                toggle.checked = showBlacklisted;
+                toggleBlacklistedColumns();
             }}
         }}
         
@@ -953,6 +1120,50 @@ def database_values():
             window.location.href = '/sync_recent?limit=' + limit;
         }}
         
+        function sortCards(containerId, sortBy) {{
+            var container = document.getElementById(containerId);
+            var cards = Array.from(container.getElementsByClassName('top-item-card'));
+            
+            cards.sort(function(a, b) {{
+                var aValue, bValue;
+                
+                if (sortBy === 'listens' || sortBy === 'plays') {{
+                    // Find the stat-value that's NOT a time-value (that's the listens/plays count)
+                    var aStats = a.querySelectorAll('.stat-value');
+                    var bStats = b.querySelectorAll('.stat-value');
+                    aValue = parseInt(aStats[0].textContent);
+                    bValue = parseInt(bStats[0].textContent);
+                }} else if (sortBy === 'time') {{
+                    // Find the time-value element and use its data-ms attribute
+                    aValue = parseInt(a.querySelector('.time-value').getAttribute('data-ms'));
+                    bValue = parseInt(b.querySelector('.time-value').getAttribute('data-ms'));
+                }}
+                
+                return bValue - aValue; // Descending order
+            }});
+            
+            // Re-append cards in sorted order and update rank numbers
+            cards.forEach(function(card, index) {{
+                container.appendChild(card);
+                card.querySelector('.rank-number').textContent = index + 1;
+            }});
+        }}
+        
+        function sortSongs() {{
+            var sortBy = document.getElementById('songSort').value;
+            sortCards('TopSongs', sortBy);
+        }}
+        
+        function sortArtists() {{
+            var sortBy = document.getElementById('artistSort').value;
+            sortCards('TopArtists', sortBy);
+        }}
+        
+        function sortAlbums() {{
+            var sortBy = document.getElementById('albumSort').value;
+            sortCards('TopAlbums', sortBy);
+        }}
+        
         function sortTable(tableId, columnIndex) {{
             var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
             table = document.getElementById(tableId);
@@ -1001,7 +1212,92 @@ def database_values():
         window.onload = function() {{
             loadTheme();
             loadTimeFormat();
+            loadBlacklistedPreference();
             document.getElementsByClassName("tablinks")[0].click();
+        }}
+        
+        // Add playlist to blacklist without page refresh
+        function addToBlacklist(event) {{
+            event.preventDefault();
+            var playlistUrl = document.getElementById('playlist_url').value;
+            
+            fetch('/add_to_blacklist', {{
+                method: 'POST',
+                headers: {{
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                }},
+                body: 'playlist_url=' + encodeURIComponent(playlistUrl)
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                if (data.success) {{
+                    // Add new playlist to the list
+                    var ul = document.querySelector('.blacklist-list ul');
+                    
+                    // Remove "no playlists" message if it exists
+                    var noPlaylistsMsg = ul.querySelector('li[style*="italic"]');
+                    if (noPlaylistsMsg) {{
+                        ul.removeChild(noPlaylistsMsg);
+                    }}
+                    
+                    var li = document.createElement('li');
+                    li.style.cssText = 'padding: 5px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;';
+                    li.setAttribute('data-playlist-id', data.playlist.id);
+                    
+                    var playlistIcon = '';
+                    if (data.playlist.image_url) {{
+                        playlistIcon = '<img src="' + data.playlist.image_url + '" alt="" style="width: 40px; height: 40px; margin-right: 10px; border-radius: 4px; vertical-align: middle;">';
+                    }} else {{
+                        playlistIcon = '• ';
+                    }}
+                    
+                    li.innerHTML = '<span style="display: flex; align-items: center;">' + playlistIcon + data.playlist.name + '</span>' +
+                                   '<a href="#" onclick="removeFromBlacklist(event, \\'' + data.playlist.id + '\\')" style="color: #dc3545; text-decoration: none; font-weight: bold; font-size: 18px; cursor: pointer; padding: 0 10px;" title="Remove from blacklist">✕</a>';
+                    
+                    ul.appendChild(li);
+                    document.getElementById('playlist_url').value = '';
+                }} else {{
+                    alert('Error: ' + data.error);
+                }}
+            }})
+            .catch(error => {{
+                alert('Error adding to blacklist');
+                console.error('Error:', error);
+            }});
+        }}
+        
+        // Remove playlist from blacklist without page refresh
+        function removeFromBlacklist(event, playlistId) {{
+            event.preventDefault();
+            
+            fetch('/remove_from_blacklist/' + playlistId, {{
+                method: 'GET'
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                if (data.success) {{
+                    // Remove the playlist from the list
+                    var li = document.querySelector('li[data-playlist-id="' + playlistId + '"]');
+                    if (li) {{
+                        li.remove();
+                    }}
+                    
+                    // If no playlists left, show the "no playlists" message
+                    var ul = document.querySelector('.blacklist-list ul');
+                    if (ul.children.length === 0) {{
+                        var li = document.createElement('li');
+                        li.style.cssText = 'color: #888; font-style: italic;';
+                        li.textContent = 'No playlists blacklisted yet';
+                        ul.appendChild(li);
+                    }}
+                }} else {{
+                    alert('Error removing from blacklist');
+                }}
+            }})
+            .catch(error => {{
+                alert('Error removing from blacklist');
+                console.error('Error:', error);
+            }});
         }}
     </script>
     
@@ -1014,16 +1310,6 @@ def database_values():
         <span class="theme-label">🌙</span>
     </div>
     
-    <!-- Time Format Toggle Switch -->
-    <div class="time-format-wrapper">
-        <span class="time-format-label">m:s</span>
-        <label class="time-format-switch" for="time-format-toggle">
-            <input type="checkbox" id="time-format-toggle" onchange="toggleTimeFormat()">
-            <div class="slider"></div>
-        </label>
-        <span class="time-format-label">d/h/m</span>
-    </div>
-    
     <!-- User Profile -->
     <div class="user-profile">
         {f'<img src="{user_image}" alt="{user_username}">' if user_image else '<div style="width: 50px; height: 50px; border-radius: 50%; background-color: #1DB954; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; color: white;">{user_username[0] if user_username else "?"}</div>'}
@@ -1034,7 +1320,7 @@ def database_values():
     
     <div class="blacklist-container" style="margin: 20px 0; padding: 15px; border: 2px solid #1DB954; border-radius: 8px; background-color: #1e1e1e;">
         <h3 style="margin-top: 0;">🚫 Blacklist</h3>
-        <form method="POST" action="/add_to_blacklist" style="margin-bottom: 15px;">
+        <form onsubmit="addToBlacklist(event)" style="margin-bottom: 15px;">
             <label for="playlist_url" style="font-weight: bold;">Playlist URL or ID:</label>
             <input type="text" id="playlist_url" name="playlist_url" placeholder="https://open.spotify.com/playlist/..." style="width: 400px; padding: 8px; margin: 0 10px; font-size: 14px;">
             <button type="submit" style="padding: 8px 16px; background-color: #dc3545; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px;">
@@ -1055,9 +1341,9 @@ def database_values():
             else:
                 playlist_icon = "• "
             
-            html += f"""<li style='padding: 5px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;'>
+            html += f"""<li style='padding: 5px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;' data-playlist-id='{playlist['id']}'>
                 <span style='display: flex; align-items: center;'>{playlist_icon}{playlist['name']}</span>
-                <a href='/remove_from_blacklist/{playlist['id']}' style='color: #dc3545; text-decoration: none; font-weight: bold; font-size: 18px; cursor: pointer; padding: 0 10px;' title='Remove from blacklist'>✕</a>
+                <a href='#' onclick='removeFromBlacklist(event, "{playlist["id"]}")' style='color: #dc3545; text-decoration: none; font-weight: bold; font-size: 18px; cursor: pointer; padding: 0 10px;' title='Remove from blacklist'>✕</a>
             </li>"""
     else:
         html += "<li style='color: #888; font-style: italic;'>No playlists blacklisted yet</li>"
@@ -1079,22 +1365,42 @@ def database_values():
     <div id="Statistics" class="tabcontent">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2 style="margin: 0;">Song Statistics</h2>
-            <div>
-                <label for="syncLimit" style="font-weight: bold; margin-right: 10px;">Sync songs (1-50):</label>
-                <input type="number" id="syncLimit" min="1" max="50" value="10" style="width: 70px; padding: 8px; font-size: 14px;">
-                <button onclick="syncSongs()" style="padding: 8px 16px; background-color: #1DB954; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px; margin-left: 10px;">
-                    🔄 Sync
-                </button>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div class="time-format-wrapper">
+                    <span class="time-format-label">Hide Blacklisted</span>
+                    <label class="time-format-switch" for="blacklist-toggle">
+                        <input type="checkbox" id="blacklist-toggle" onchange="toggleBlacklistedColumns()">
+                        <div class="slider"></div>
+                    </label>
+                    <span class="time-format-label">Show Blacklisted</span>
+                </div>
+                <div class="time-format-wrapper">
+                    <span class="time-format-label">m:s</span>
+                    <label class="time-format-switch" for="time-format-toggle-stats">
+                        <input type="checkbox" id="time-format-toggle-stats" onchange="toggleTimeFormat('time-format-toggle-stats')">
+                        <div class="slider"></div>
+                    </label>
+                    <span class="time-format-label">d/h/m</span>
+                </div>
+                <div>
+                    <label for="syncLimit" style="font-weight: bold; margin-right: 10px;">Sync songs (1-50):</label>
+                    <input type="number" id="syncLimit" min="1" max="50" value="10" style="width: 70px; padding: 8px; font-size: 14px;">
+                    <button onclick="syncSongs()" style="padding: 8px 16px; background-color: #1DB954; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px; margin-left: 10px;">
+                        🔄 Sync
+                    </button>
+                </div>
             </div>
         </div>
-        <table border="1" style="border-collapse: collapse; width: 100%;">
+        <table border="1" style="border-collapse: collapse; width: 100%; table-layout: fixed;">
             <tr>
                 <th style="padding: 10px;">Title</th>
                 <th style="padding: 10px;">Artist(s)</th>
                 <th style="padding: 10px;">Album</th>
-                <th style="padding: 10px; text-align: center;">Length</th>
-                <th style="padding: 10px; text-align: center;">Listen Count</th>
-                <th style="padding: 10px; text-align: center;">Total Listen Time</th>
+                <th style="padding: 10px; text-align: center; width: 100px;">Length</th>
+                <th style="padding: 10px; text-align: center; width: 100px;">Listen Count</th>
+                <th style="padding: 10px; text-align: center; width: 120px;">Total Listen Time</th>
+                <th class="blacklisted-column" style="padding: 10px; text-align: center; width: 100px; display: none;">Blacklisted Listens</th>
+                <th class="blacklisted-column" style="padding: 10px; text-align: center; width: 120px; display: none;">Blacklisted Time</th>
             </tr>
     """
     
@@ -1107,6 +1413,8 @@ def database_values():
                 <td style="padding: 10px; text-align: center;" class="time-value" data-ms="{song['length_ms']}">{song['length_formatted']}</td>
                 <td style="padding: 10px; text-align: center;">{song['listen_count']}</td>
                 <td style="padding: 10px; text-align: center;" class="time-value" data-ms="{song['listen_time_ms']}">{song['listen_time_formatted']}</td>
+                <td class="blacklisted-column" style="padding: 10px; text-align: center; display: none;">{song['blacklisted_listens']}</td>
+                <td class="blacklisted-column" style="padding: 10px; text-align: center; display: none;" class="time-value" data-ms="{song['blacklisted_time_ms']}">{song['blacklisted_time_formatted']}</td>
             </tr>
         """
     
@@ -1114,11 +1422,13 @@ def database_values():
         </table>
         
         <h2>Artist Statistics</h2>
-        <table border="1" style="border-collapse: collapse; width: 100%;">
+        <table border="1" style="border-collapse: collapse; width: 100%; table-layout: fixed;">
             <tr>
                 <th style="padding: 10px;">Artist Name</th>
-                <th style="padding: 10px; text-align: center;">Total Listens</th>
-                <th style="padding: 10px; text-align: center;">Total Listen Time</th>
+                <th style="padding: 10px; text-align: center; width: 120px;">Total Listens</th>
+                <th style="padding: 10px; text-align: center; width: 140px;">Total Listen Time</th>
+                <th class="blacklisted-column" style="padding: 10px; text-align: center; width: 100px; display: none;">Blacklisted Listens</th>
+                <th class="blacklisted-column" style="padding: 10px; text-align: center; width: 120px; display: none;">Blacklisted Time</th>
             </tr>
     """
     
@@ -1128,6 +1438,8 @@ def database_values():
                 <td style="padding: 10px;">{artist['name']}</td>
                 <td style="padding: 10px; text-align: center;">{artist['listens']}</td>
                 <td style="padding: 10px; text-align: center;" class="time-value" data-ms="{artist['listen_time_ms']}">{artist['listen_time_formatted']}</td>
+                <td class="blacklisted-column" style="padding: 10px; text-align: center; display: none;">{artist['blacklisted_listens']}</td>
+                <td class="blacklisted-column" style="padding: 10px; text-align: center; display: none;" class="time-value" data-ms="{artist['blacklisted_time_ms']}">{artist['blacklisted_time_formatted']}</td>
             </tr>
         """
     
@@ -1135,12 +1447,14 @@ def database_values():
         </table>
         
         <h2>Album Statistics</h2>
-        <table border="1" style="border-collapse: collapse; width: 100%;">
+        <table border="1" style="border-collapse: collapse; width: 100%; table-layout: fixed;">
             <tr>
                 <th style="padding: 10px;">Album Title</th>
-                <th style="padding: 10px; text-align: center;">Total Listen Time</th>
-                <th style="padding: 10px; text-align: center;">Album Listens</th>
-                <th style="padding: 10px; text-align: center;">Album Length</th>
+                <th style="padding: 10px; text-align: center; width: 140px;">Total Listen Time</th>
+                <th style="padding: 10px; text-align: center; width: 120px;">Album Listens</th>
+                <th style="padding: 10px; text-align: center; width: 120px;">Album Length</th>
+                <th class="blacklisted-column" style="padding: 10px; text-align: center; width: 100px; display: none;">Blacklisted Listens</th>
+                <th class="blacklisted-column" style="padding: 10px; text-align: center; width: 120px; display: none;">Blacklisted Time</th>
             </tr>
     """
     
@@ -1151,6 +1465,8 @@ def database_values():
                 <td style="padding: 10px; text-align: center;" class="time-value" data-ms="{album['listen_time_ms']}">{album['listen_time_formatted']}</td>
                 <td style="padding: 10px; text-align: center;">{album['listens']}</td>
                 <td style="padding: 10px; text-align: center;" class="time-value" data-ms="{album['length_ms']}">{album['length_formatted']}</td>
+                <td class="blacklisted-column" style="padding: 10px; text-align: center; display: none;">{album['blacklisted_listens']}</td>
+                <td class="blacklisted-column" style="padding: 10px; text-align: center; display: none;" class="time-value" data-ms="{album['blacklisted_time_ms']}">{album['blacklisted_time_formatted']}</td>
             </tr>
         """
     
@@ -1184,22 +1500,28 @@ def database_values():
     <!-- Top Songs Tab -->
     <div id="TopSongs" class="tabcontent">
         <h2>Top Songs</h2>
-        <div class="sort-control">
-            <label for="songSort" style="font-weight: bold; margin-right: 10px;">Sort by:</label>
-            <select id="songSort" onchange="location.reload()">
-                <option value="listens">Listen Count</option>
-                <option value="time">Total Listen Time</option>
-            </select>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 15px 0;">
+            <div class="sort-control">
+                <label for="songSort" style="font-weight: bold; margin-right: 10px;">Sort by:</label>
+                <select id="songSort" onchange="sortSongs()">
+                    <option value="listens">Listen Count</option>
+                    <option value="time">Total Listen Time</option>
+                </select>
+            </div>
+            <div class="time-format-wrapper">
+                <span class="time-format-label">m:s</span>
+                <label class="time-format-switch" for="time-format-toggle">
+                    <input type="checkbox" id="time-format-toggle" onchange="toggleTimeFormat('time-format-toggle')">
+                    <div class="slider"></div>
+                </label>
+                <span class="time-format-label">d/h/m</span>
+            </div>
         </div>
     """
     
     for idx, song in enumerate(song_list[:50], 1):  # Top 50 songs
         # Use actual album art or fallback to SVG placeholder
         img_url = song.get('image_url') or "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' fill='%231DB954'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='40' fill='white'%3E♪%3C/text%3E%3C/svg%3E"
-        
-        # Debug: print first 3 songs
-        if idx <= 3:
-            print(f"DEBUG Top Song {idx}: {song['title']}, image_url: {song.get('image_url', 'NONE')[:50] if song.get('image_url') else 'NONE'}")
         
         html += f"""
         <div class="top-item-card">
@@ -1228,12 +1550,22 @@ def database_values():
     <!-- Top Artists Tab -->
     <div id="TopArtists" class="tabcontent">
         <h2>Top Artists</h2>
-        <div class="sort-control">
-            <label for="artistSort" style="font-weight: bold; margin-right: 10px;">Sort by:</label>
-            <select id="artistSort" onchange="location.reload()">
-                <option value="listens">Total Listens</option>
-                <option value="time">Total Listen Time</option>
-            </select>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 15px 0;">
+            <div class="sort-control">
+                <label for="artistSort" style="font-weight: bold; margin-right: 10px;">Sort by:</label>
+                <select id="artistSort" onchange="sortArtists()">
+                    <option value="listens">Total Listens</option>
+                    <option value="time">Total Listen Time</option>
+                </select>
+            </div>
+            <div class="time-format-wrapper">
+                <span class="time-format-label">m:s</span>
+                <label class="time-format-switch" for="time-format-toggle-artists">
+                    <input type="checkbox" id="time-format-toggle-artists" onchange="toggleTimeFormat('time-format-toggle-artists')">
+                    <div class="slider"></div>
+                </label>
+                <span class="time-format-label">d/h/m</span>
+            </div>
         </div>
     """
     
@@ -1268,12 +1600,22 @@ def database_values():
     <!-- Top Albums Tab -->
     <div id="TopAlbums" class="tabcontent">
         <h2>Top Albums</h2>
-        <div class="sort-control">
-            <label for="albumSort" style="font-weight: bold; margin-right: 10px;">Sort by:</label>
-            <select id="albumSort" onchange="location.reload()">
-                <option value="listens">Album Listens</option>
-                <option value="time">Total Listen Time</option>
-            </select>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 15px 0;">
+            <div class="sort-control">
+                <label for="albumSort" style="font-weight: bold; margin-right: 10px;">Sort by:</label>
+                <select id="albumSort" onchange="sortAlbums()">
+                    <option value="listens">Album Listens</option>
+                    <option value="time">Total Listen Time</option>
+                </select>
+            </div>
+            <div class="time-format-wrapper">
+                <span class="time-format-label">m:s</span>
+                <label class="time-format-switch" for="time-format-toggle-albums">
+                    <input type="checkbox" id="time-format-toggle-albums" onchange="toggleTimeFormat('time-format-toggle-albums')">
+                    <div class="slider"></div>
+                </label>
+                <span class="time-format-label">d/h/m</span>
+            </div>
         </div>
     """
     
