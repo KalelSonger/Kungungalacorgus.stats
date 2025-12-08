@@ -61,6 +61,40 @@ def get_db_connection():
         print(f"Error connecting to MySQL: {e}")
         return None
 
+def create_indexes():
+    """Create database indexes for better query performance"""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        cursor = conn.cursor()
+        
+        # Songs indexes
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_s_id ON Songs(S_ID)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_s_listens ON Songs(S_Listens)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_s_listen_time ON Songs(S_Listen_Time)")
+        
+        # Artists indexes
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_a_id ON Artists(A_ID)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_a_listens ON Artists(A_Listens)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_a_listen_time ON Artists(A_Listen_Time)")
+        
+        # Albums indexes
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_album_id ON Albums(A_ID)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_album_listen_time ON Albums(A_Listen_Time)")
+        
+        conn.commit()
+        cursor.close()
+        print("✓ Database indexes created successfully")
+        return True
+    except Error as e:
+        print(f"Note: Could not create indexes (may already exist): {e}")
+        return False
+    finally:
+        if conn.is_connected():
+            conn.close()
+
 def init_database():
     """Initialize the database - create if needed, then verify tables"""
     # Try to create database if it doesn't exist
@@ -78,6 +112,10 @@ def init_database():
         tables = cursor.fetchall()
         cursor.close()
         print(f"✓ Connected to database successfully ({len(tables)} tables found)")
+        
+        # Create indexes for performance
+        create_indexes()
+        
         return True
     except Error as e:
         print(f"Error checking database: {e}")
