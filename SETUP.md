@@ -35,17 +35,25 @@ sudo systemctl start mysql
 sudo mysql_secure_installation  # Follow prompts to set root password
 ```
 
-### 2. Create the Database
+
 
 ### 2. Configure MySQL Root Password
 
 The application will automatically create the database and user when it first runs. You just need to provide your MySQL root password.
 
-Edit the `.env` file and set your MySQL root password:
+1. Copy `.env.example` to `.env`:
+   ```bash
+   # Windows PowerShell
+   Copy-Item .env.example .env
+   
+   # Mac/Linux
+   cp .env.example .env
+   ```
 
-```env
-DB_PASSWORD=your_mysql_root_password_here
-```
+2. Edit the `.env` file and set your MySQL root password:
+   ```env
+   DB_PASSWORD=your_mysql_root_password_here
+   ```
 
 **That's it!** The database will be created automatically on first run.
 

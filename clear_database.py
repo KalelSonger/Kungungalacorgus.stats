@@ -16,7 +16,6 @@ cursor = connection.cursor()
 
 print("Clearing database tables...")
 
-# Clear tables in correct order due to foreign keys
 cursor.execute("DELETE FROM Album_Song")
 print("✓ Cleared Album_Song")
 
