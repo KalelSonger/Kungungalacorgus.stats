@@ -1153,6 +1153,9 @@ def database_values():
             }}
         }}
         
+        // Track which tabs have been opened
+        var openedTabs = {{}};
+        
         function openTab(evt, tabName) {{
             var i, tabcontent, tablinks;
             tabcontent = document.getElementsByClassName("tabcontent");
@@ -1165,6 +1168,20 @@ def database_values():
             }}
             document.getElementById(tabName).style.display = "block";
             evt.currentTarget.className += " active";
+            
+            // Sort the tab on first open
+            if (!openedTabs[tabName]) {{
+                openedTabs[tabName] = true;
+                
+                // Sort each tab by its default sort option
+                if (tabName === 'TopSongs') {{
+                    sortCards('TopSongs', 'listens');
+                }} else if (tabName === 'TopArtists') {{
+                    sortCards('TopArtists', 'listens');
+                }} else if (tabName === 'TopAlbums') {{
+                    sortCards('TopAlbums', 'time');
+                }}
+            }}
         }}
         
         function syncSongs() {{
