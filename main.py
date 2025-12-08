@@ -1436,14 +1436,6 @@ def database_values():
     
     <h1 class="main-title">Welcome to Kungungalacorgus.stats!</h1>
     
-    <!-- Clear Database Button -->
-    <div style="text-align: center; margin: 15px 0;">
-        <button onclick="clearDatabase()" style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px;">
-            🗑️ Clear Database
-        </button>
-        <p style="font-size: 12px; color: #888; margin: 5px 0 0 0;">⚠️ This will delete ALL your data!</p>
-    </div>
-    
     <div class="blacklist-container" style="margin: 20px 0; padding: 15px; border: 2px solid #1DB954; border-radius: 8px; background-color: #1e1e1e;">
         <h3 style="margin-top: 0;">🚫 Blacklist</h3>
         <p style="color: #ffa500; font-size: 14px; margin-bottom: 15px; padding: 10px; background-color: #2a2a2a; border-radius: 4px;">
@@ -1481,6 +1473,14 @@ def database_values():
     html += """
             </ul>
         </div>
+    </div>
+    
+    <!-- Clear Database Button -->
+    <div style="text-align: center; margin: 20px 0;">
+        <button onclick="clearDatabase()" style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px;">
+            🗑️ Clear Database
+        </button>
+        <p style="font-size: 12px; color: #888; margin: 5px 0 0 0;">⚠️ This will delete ALL your data!</p>
     </div>
     
     <!-- Tab Navigation -->
@@ -1916,4 +1916,4 @@ def refresh_token():
     return redirect('/menu')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', debug=False, use_reloader=False)

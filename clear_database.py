@@ -16,6 +16,9 @@ cursor = connection.cursor()
 
 print("Clearing database tables...")
 
+# Disable foreign key checks to ensure all data is deleted
+cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+
 cursor.execute("DELETE FROM Album_Song")
 print("✓ Cleared Album_Song")
 
@@ -30,6 +33,9 @@ print("✓ Cleared Artists")
 
 cursor.execute("DELETE FROM Albums")
 print("✓ Cleared Albums")
+
+# Re-enable foreign key checks
+cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
 
 # Drop last_played column if it exists
 try:
