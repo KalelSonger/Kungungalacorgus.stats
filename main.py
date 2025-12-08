@@ -668,6 +668,30 @@ def database_values():
             'image_url': album.get('image_url')
         })
     
+    # Calculate totals for songs
+    total_song_listens = sum(song['listen_count'] for song in song_list)
+    total_song_time_ms = sum(song['listen_time_ms'] for song in song_list)
+    total_song_time_formatted = f"{total_song_time_ms // 60000}:{(total_song_time_ms % 60000) // 1000:02d}"
+    total_song_blacklisted_listens = sum(song['blacklisted_listens'] for song in song_list)
+    total_song_blacklisted_time_ms = sum(song['blacklisted_time_ms'] for song in song_list)
+    total_song_blacklisted_time_formatted = f"{total_song_blacklisted_time_ms // 60000}:{(total_song_blacklisted_time_ms % 60000) // 1000:02d}"
+    
+    # Calculate totals for artists
+    total_artist_listens = sum(artist['listens'] for artist in artist_list)
+    total_artist_time_ms = sum(artist['listen_time_ms'] for artist in artist_list)
+    total_artist_time_formatted = f"{total_artist_time_ms // 60000}:{(total_artist_time_ms % 60000) // 1000:02d}"
+    total_artist_blacklisted_listens = sum(artist['blacklisted_listens'] for artist in artist_list)
+    total_artist_blacklisted_time_ms = sum(artist['blacklisted_time_ms'] for artist in artist_list)
+    total_artist_blacklisted_time_formatted = f"{total_artist_blacklisted_time_ms // 60000}:{(total_artist_blacklisted_time_ms % 60000) // 1000:02d}"
+    
+    # Calculate totals for albums
+    total_album_listens = sum(album['listens'] for album in album_list)
+    total_album_time_ms = sum(album['listen_time_ms'] for album in album_list)
+    total_album_time_formatted = f"{total_album_time_ms // 60000}:{(total_album_time_ms % 60000) // 1000:02d}"
+    total_album_blacklisted_listens = sum(album['blacklisted_listens'] for album in album_list)
+    total_album_blacklisted_time_ms = sum(album['blacklisted_time_ms'] for album in album_list)
+    total_album_blacklisted_time_formatted = f"{total_album_blacklisted_time_ms // 60000}:{(total_album_blacklisted_time_ms % 60000) // 1000:02d}"
+    
     # Get blacklist from persistent storage
     blacklist = get_blacklist()
     
@@ -1341,7 +1365,7 @@ def database_values():
     
     <!-- User Profile -->
     <div class="user-profile">
-        {f'<img src="{user_image}" alt="{user_username}">' if user_image else '<div style="width: 50px; height: 50px; border-radius: 50%; background-color: #1DB954; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; color: white;">{user_username[0] if user_username else "?"}</div>'}
+        {'<img src="' + user_image + '" alt="' + user_username + '">' if user_image else '<div style="width: 50px; height: 50px; border-radius: 50%; background-color: #1DB954; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; color: white;">' + (user_username[0] if user_username else "?") + '</div>'}
         <span>{user_username}</span>
     </div>
     
@@ -1450,6 +1474,25 @@ def database_values():
     html += """
         </table>
         
+        <!-- Song Totals -->
+        <div style="margin: 20px 0; padding: 15px; background-color: #1e1e1e; border-radius: 8px; border: 2px solid #1DB954;">
+            <h3 style="margin-top: 0; color: #1DB954;">Song Totals</h3>
+            <div style="display: flex; gap: 30px; flex-wrap: wrap;">
+                <div>
+                    <strong>Total Listens:</strong> """ + str(total_song_listens) + """
+                </div>
+                <div>
+                    <strong>Total Listen Time:</strong> <span class="time-value" data-ms=\"""" + str(total_song_time_ms) + """\">""" + total_song_time_formatted + """</span>
+                </div>
+                <div class="blacklisted-column" style="display: none;">
+                    <strong>Total Blacklisted Listens:</strong> """ + str(total_song_blacklisted_listens) + """
+                </div>
+                <div class="blacklisted-column" style="display: none;">
+                    <strong>Total Blacklisted Time:</strong> <span class="time-value" data-ms=\"""" + str(total_song_blacklisted_time_ms) + """\">""" + total_song_blacklisted_time_formatted + """</span>
+                </div>
+            </div>
+        </div>
+        
         <h2>Artist Statistics</h2>
         <table border="1" style="border-collapse: collapse; width: 100%; table-layout: fixed;">
             <tr>
@@ -1474,6 +1517,25 @@ def database_values():
     
     html += """
         </table>
+        
+        <!-- Artist Totals -->
+        <div style="margin: 20px 0; padding: 15px; background-color: #1e1e1e; border-radius: 8px; border: 2px solid #1DB954;">
+            <h3 style="margin-top: 0; color: #1DB954;">Artist Totals</h3>
+            <div style="display: flex; gap: 30px; flex-wrap: wrap;">
+                <div>
+                    <strong>Total Listens:</strong> """ + str(total_artist_listens) + """
+                </div>
+                <div>
+                    <strong>Total Listen Time:</strong> <span class="time-value" data-ms=\"""" + str(total_artist_time_ms) + """\">""" + total_artist_time_formatted + """</span>
+                </div>
+                <div class="blacklisted-column" style="display: none;">
+                    <strong>Total Blacklisted Listens:</strong> """ + str(total_artist_blacklisted_listens) + """
+                </div>
+                <div class="blacklisted-column" style="display: none;">
+                    <strong>Total Blacklisted Time:</strong> <span class="time-value" data-ms=\"""" + str(total_artist_blacklisted_time_ms) + """\">""" + total_artist_blacklisted_time_formatted + """</span>
+                </div>
+            </div>
+        </div>
         
         <h2>Album Statistics</h2>
         <table border="1" style="border-collapse: collapse; width: 100%; table-layout: fixed;">
@@ -1501,6 +1563,25 @@ def database_values():
     
     html += """
         </table>
+        
+        <!-- Album Totals -->
+        <div style="margin: 20px 0; padding: 15px; background-color: #1e1e1e; border-radius: 8px; border: 2px solid #1DB954;">
+            <h3 style="margin-top: 0; color: #1DB954;">Album Totals</h3>
+            <div style="display: flex; gap: 30px; flex-wrap: wrap;">
+                <div>
+                    <strong>Total Listens:</strong> """ + str(total_album_listens) + """
+                </div>
+                <div>
+                    <strong>Total Listen Time:</strong> <span class="time-value" data-ms=\"""" + str(total_album_time_ms) + """\">""" + total_album_time_formatted + """</span>
+                </div>
+                <div class="blacklisted-column" style="display: none;">
+                    <strong>Total Blacklisted Listens:</strong> """ + str(total_album_blacklisted_listens) + """
+                </div>
+                <div class="blacklisted-column" style="display: none;">
+                    <strong>Total Blacklisted Time:</strong> <span class="time-value" data-ms=\"""" + str(total_album_blacklisted_time_ms) + """\">""" + total_album_blacklisted_time_formatted + """</span>
+                </div>
+            </div>
+        </div>
         
         <h2>Your Playlists</h2>
         <table border="1" style="border-collapse: collapse; width: 100%;">
@@ -1634,7 +1715,6 @@ def database_values():
             <img src="{img_url}" alt="{artist['name']}" class="item-image">
             <div class="item-info">
                 <div class="item-title">{artist['name']}</div>
-                <div class="item-subtitle">Artist</div>
             </div>
             <div class="item-stats">
                 <div class="stat-box blacklisted-stats" style="display: none;">
@@ -1701,7 +1781,7 @@ def database_values():
             <img src="{img_url}" alt="{album['title']}" class="item-image">
             <div class="item-info">
                 <div class="item-title">{album['title']}</div>
-                <div class="item-subtitle">Album • <span class="time-value" data-ms="{album['length_ms']}">{album['length_formatted']}</span></div>
+                <div class="item-subtitle">Length: <span class="time-value" data-ms="{album['length_ms']}">{album['length_formatted']}</span></div>
             </div>
             <div class="item-stats">
                 <div class="stat-box blacklisted-stats" style="display: none;">
