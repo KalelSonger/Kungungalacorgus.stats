@@ -50,11 +50,13 @@ DROP TABLE IF EXISTS `Albums`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Albums` (
   `A_ID` varchar(50) NOT NULL,
-  `A_Title` varchar(50) NOT NULL,
-  `A_Listen_Time` int DEFAULT NULL,
-  `A_Listens` int DEFAULT NULL,
-  `A_Length` int DEFAULT NULL,
-  `flag` tinyint(1) DEFAULT '0',
+  `A_Title` varchar(500) NOT NULL,
+  `A_Listen_Time` BIGINT DEFAULT 0,
+  `A_Listens` INT DEFAULT 0,
+  `A_Length` BIGINT DEFAULT 0,
+  `image_url` VARCHAR(500) DEFAULT NULL,
+  `A_Blacklisted_Listens` INT DEFAULT 0,
+  `A_Blacklisted_Time` BIGINT DEFAULT 0,
   PRIMARY KEY (`A_ID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -77,10 +79,12 @@ DROP TABLE IF EXISTS `Artists`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Artists` (
   `A_ID` varchar(50) NOT NULL,
-  `A_Name` varchar(50) NOT NULL,
-  `A_Listens` int NOT NULL,
-  `A_ListenTime` int DEFAULT NULL,
-  `flag` tinyint(1) DEFAULT '0',
+  `A_Name` varchar(500) NOT NULL,
+  `A_Listens` INT DEFAULT 0,
+  `A_Listen_Time` BIGINT DEFAULT 0,
+  `image_url` VARCHAR(500) DEFAULT NULL,
+  `A_Blacklisted_Listens` INT DEFAULT 0,
+  `A_Blacklisted_Time` BIGINT DEFAULT 0,
   PRIMARY KEY (`A_ID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -184,11 +188,15 @@ DROP TABLE IF EXISTS `Songs`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Songs` (
   `S_ID` varchar(50) NOT NULL,
-  `S_Title` varchar(50) NOT NULL,
-  `S_Length` int NOT NULL,
-  `S_Listens` int DEFAULT NULL,
-  `S_Listen_Time` int DEFAULT NULL,
-  `flag` tinyint(1) DEFAULT '0',
+  `S_Title` varchar(500) NOT NULL,
+  `S_Artists` varchar(1000) DEFAULT NULL,
+  `S_Album` varchar(500) DEFAULT NULL,
+  `S_Length` BIGINT NOT NULL,
+  `S_Listens` INT DEFAULT 0,
+  `S_Listen_Time` BIGINT DEFAULT 0,
+  `image_url` VARCHAR(500) DEFAULT NULL,
+  `S_Blacklisted_Listens` INT DEFAULT 0,
+  `S_Blacklisted_Time` BIGINT DEFAULT 0,
   PRIMARY KEY (`S_ID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

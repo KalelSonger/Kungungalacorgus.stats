@@ -21,6 +21,9 @@ last_sync.txt
 # User Data
 blacklist.json
 
+# Documentation
+FUNCTION_REFERENCE.txt
+
 # IDE
 .vscode/
 .idea/
