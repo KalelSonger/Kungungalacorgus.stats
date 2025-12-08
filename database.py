@@ -798,6 +798,11 @@ def get_blacklist():
         if os.path.exists('blacklist.json'):
             with open('blacklist.json', 'r', encoding='utf-8') as f:
                 return json.load(f)
+        else:
+            # Create empty blacklist file if it doesn't exist
+            with open('blacklist.json', 'w', encoding='utf-8') as f:
+                json.dump([], f)
+            return []
     except Exception as e:
         print(f"Error reading blacklist: {e}")
     return []

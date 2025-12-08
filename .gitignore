@@ -18,6 +18,9 @@ spotify_token.json
 # Database
 last_sync.txt
 
+# User Data
+blacklist.json
+
 # IDE
 .vscode/
 .idea/
