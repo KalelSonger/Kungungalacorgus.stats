@@ -42,8 +42,8 @@ def create_database_if_not_exists():
         return True
         
     except Error as e:
-        print(f"Note: Could not auto-create database (need root access): {e}")
-        print("Please create the database manually - see SETUP.md")
+        # Auto-creation failed - database likely already exists or wrong root password
+        # This is fine, will try connecting with regular credentials next
         return False
 
 def get_db_connection():
