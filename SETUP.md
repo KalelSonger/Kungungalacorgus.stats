@@ -37,6 +37,22 @@ sudo mysql_secure_installation  # Follow prompts to set root password
 
 ### 2. Create the Database
 
+### 2. Configure MySQL Root Password
+
+The application will automatically create the database and user when it first runs. You just need to provide your MySQL root password.
+
+Edit the `.env` file and set your MySQL root password:
+
+```env
+DB_PASSWORD=your_mysql_root_password_here
+```
+
+**That's it!** The database will be created automatically on first run.
+
+#### (Optional) Manual Database Setup
+
+If you prefer to create the database manually, or if automatic creation fails:
+
 Login to MySQL with your root password:
 
 ```bash
@@ -53,12 +69,16 @@ FLUSH PRIVILEGES;
 EXIT;
 ```
 
-**Note**: The password `Spotify123!` is pre-configured in the `.env` file. You can change it if desired, but make sure to update `.env` accordingly.
-
-Import the database schema:
+Then import the schema:
 
 ```bash
 mysql -u root -p spotifyDatabase < Stats.sql
+```
+
+If you do manual setup, update `.env` to use `spotify_user` instead of `root`:
+```env
+DB_USER=spotify_user
+DB_PASSWORD=Spotify123!
 ```
 
 ### 3. Install Python Dependencies
@@ -134,16 +154,16 @@ python3 main.py
 ### What Happens When You Run
 
 The application will:
-1. ✓ Connect to MySQL database
-2. ✓ Auto-create tables if they don't exist
-3. ✓ Start ngrok tunnel at https://easily-crankier-coleman.ngrok-free.dev
-4. ✓ Start Flask server on port 5000
-5. ✓ Begin background sync (every 2 minutes)
+1. Connect to MySQL database
+2. Auto-create tables if they don't exist
+3. Start ngrok tunnel at https://easily-crankier-coleman.ngrok-free.dev
+4. Start Flask server on port 5000
+5. Begin background sync (every 2 minutes)
 
 You'll see output like:
 ```
-✓ Connected to database successfully (8 tables found)
-✓ ngrok tunnel started successfully
+Connected to database successfully (8 tables found)
+ngrok tunnel started successfully
    App available at: https://easily-crankier-coleman.ngrok-free.dev
  * Running on http://127.0.0.1:5000
 ```

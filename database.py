@@ -6,6 +6,46 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+def create_database_if_not_exists():
+    """Create the database and user if they don't exist"""
+    try:
+        # Connect without specifying database
+        connection = mysql.connector.connect(
+            host=os.getenv('DB_HOST', 'localhost'),
+            port=int(os.getenv('DB_PORT', 3306)),
+            user='root',  # Need root to create database
+            password=os.getenv('DB_PASSWORD', '')
+        )
+        
+        cursor = connection.cursor()
+        
+        # Create database if it doesn't exist
+        db_name = os.getenv('DB_NAME', 'spotifyDatabase')
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
+        print(f"✓ Database '{db_name}' ready")
+        
+        # Create user if it doesn't exist (MySQL 5.7+ syntax)
+        db_user = os.getenv('DB_USER', 'spotify_user')
+        db_pass = os.getenv('DB_PASSWORD', '')
+        
+        try:
+            cursor.execute(f"CREATE USER IF NOT EXISTS '{db_user}'@'localhost' IDENTIFIED BY '{db_pass}'")
+            cursor.execute(f"GRANT ALL PRIVILEGES ON {db_name}.* TO '{db_user}'@'localhost'")
+            cursor.execute("FLUSH PRIVILEGES")
+            print(f"✓ Database user '{db_user}' configured")
+        except Error as e:
+            # User might already exist, that's okay
+            pass
+        
+        cursor.close()
+        connection.close()
+        return True
+        
+    except Error as e:
+        print(f"Note: Could not auto-create database (need root access): {e}")
+        print("Please create the database manually - see SETUP.md")
+        return False
+
 def get_db_connection():
     """Create and return a MySQL database connection"""
     try:
@@ -22,7 +62,10 @@ def get_db_connection():
         return None
 
 def init_database():
-    """Initialize the database - tables should already exist from Stats.sql"""
+    """Initialize the database - create if needed, then verify tables"""
+    # Try to create database if it doesn't exist
+    create_database_if_not_exists()
+    
     connection = get_db_connection()
     if not connection:
         print("Warning: Could not connect to database. Make sure MySQL is running and credentials in .env are correct.")
