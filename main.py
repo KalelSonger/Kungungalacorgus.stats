@@ -130,19 +130,19 @@ def sync_recent_plays_background():
         else:
             access_token = token_data['access_token']
         
-        # Get the last sync timestamp to avoid reprocessing old plays
+
         last_sync = get_last_sync_timestamp()
         
         headers = {'Authorization': f"Bearer {access_token}"}
         
-        # Get recently played tracks
+
         response = requests.get(API_BASE_URL + '/me/player/recently-played?limit=50', headers=headers)
         
         if response.status_code == 200:
             recent_data = response.json()
             items = recent_data.get('items', [])
             
-            # Process items in reverse order (oldest first) to track timestamp correctly
+
             new_plays = []
             latest_timestamp = last_sync
             
@@ -152,7 +152,6 @@ def sync_recent_plays_background():
                 # Only process plays newer than our last sync
                 if last_sync is None or played_at > last_sync:
                     new_plays.append(item)
-                    # Track the latest timestamp
                     if latest_timestamp is None or played_at > latest_timestamp:
                         latest_timestamp = played_at
             
@@ -162,12 +161,11 @@ def sync_recent_plays_background():
                     track = item['track']
                     played_at = datetime.fromisoformat(item['played_at'].replace('Z', '+00:00'))
                     
-                    # Get context from the recently-played item itself
                     context = item.get('context')
                     
                     process_and_store_track(track, played_at, access_token, context)
                 
-                # Save the latest timestamp
+                
                 save_last_sync_timestamp(latest_timestamp)
                 print(f"✓ Background sync: Processed {len(new_plays)} new track(s)")
             else:
@@ -175,25 +173,16 @@ def sync_recent_plays_background():
     except Exception as e:
         print(f"Background sync error: {e}")
 
-# Schedule background sync every 2 minutes
 scheduler.add_job(func=sync_recent_plays_background, trigger="interval", minutes=2, id='sync_job')
 
+#Process a track and store it in the database with all related data
 def process_and_store_track(track, played_at, access_token, context=None):
-    """Process a track and store it in the database with all related data
     
-    Args:
-        track: The track data from Spotify API
-        played_at: Datetime when the track was played
-        access_token: Spotify API access token
-        context: Optional context dict containing 'type' and 'uri' of playback source
-    """
     try:
-        # Determine if this play is from a blacklisted playlist
         is_blacklisted = False
         
         if context and context.get('type') == 'playlist':
             playlist_uri = context.get('uri', '')
-            # Extract playlist ID from URI (spotify:playlist:ID)
             playlist_id = playlist_uri.split(':')[-1] if playlist_uri else None
             
             if playlist_id:
@@ -218,11 +207,9 @@ def process_and_store_track(track, played_at, access_token, context=None):
             return
         print(f"  ✓ Song inserted/updated")
         
-        # Get album info
         album_id = track['album']['id']
         album_title = track['album']['name']
         
-        # Get full album details and INSERT ALBUM FIRST (before creating foreign key links)
         headers = {'Authorization': f"Bearer {access_token}"}
         album_response = requests.get(f"{API_BASE_URL}/albums/{album_id}", headers=headers)
         
@@ -249,7 +236,7 @@ def process_and_store_track(track, played_at, access_token, context=None):
             print(f"  ⚠ Failed to fetch album details for {album_title}: {album_response.status_code}")
             return
         
-        # NOW process artists and create relationships (album exists now!)
+        # process artists and create relationships (album exists now yippee!)
         for artist in track['artists']:
             artist_id = artist['id']
             artist_name = artist['name']
@@ -389,11 +376,9 @@ def callback():
     response = requests.post(TOKEN_URL, data=req_body)
     token_info = response.json()
     
-    # Check if we got an error from Spotify
     if 'error' in token_info:
         return f"<h1>Spotify Error</h1><p>{token_info.get('error')}: {token_info.get('error_description', 'No description')}</p>"
     
-    # Ensure we have required fields
     if 'access_token' not in token_info:
         return f"<h1>Token Error</h1><p>Did not receive access token. Response: {token_info}</p>"
     
@@ -402,7 +387,6 @@ def callback():
     session['refresh_token'] = token_info.get('refresh_token', '')
     session['expires_at'] = expires_at
     
-    # Save token to file for background job
     save_token_to_file(token_info['access_token'], token_info.get('refresh_token', ''), expires_at)
     
     return redirect('/database_values')
@@ -436,7 +420,7 @@ def sync_recent():
     # Get limit from query parameter, default to 10
     try:
         limit = int(request.args.get('limit', 10))
-        # Cap at 50 (Spotify API limit)
+        # spotify api limit = 50 dont exceed
         limit = min(max(1, limit), 50)
     except ValueError:
         limit = 10
@@ -462,14 +446,11 @@ def sync_recent():
                 played_at = item['played_at']
                 played_at_dt = datetime.fromisoformat(item['played_at'].replace('Z', '+00:00'))
                 
-                # Get context from the recently-played item
                 context = item.get('context')
                 
-                # Process the track
                 process_and_store_track(track, played_at_dt, session['access_token'], context)
                 processed_count += 1
                 
-                # Track the latest timestamp (only update if this is newer)
                 if latest_timestamp is None or played_at > latest_timestamp:
                     latest_timestamp = played_at
             
@@ -494,11 +475,11 @@ def add_to_blacklist_route():
     if not playlist_url:
         return jsonify({'success': False, 'error': 'No playlist URL provided'})
     
-    # Extract playlist ID from URL (supports various Spotify URL formats)
+    # Extract playlist ID from URL 
     playlist_id = None
     if 'playlist/' in playlist_url:
         playlist_id = playlist_url.split('playlist/')[-1].split('?')[0]
-    elif len(playlist_url) == 22:  # Direct ID
+    elif len(playlist_url) == 22: 
         playlist_id = playlist_url
     
     if playlist_id:
@@ -515,7 +496,6 @@ def add_to_blacklist_route():
                 if playlist_data.get('images') and len(playlist_data['images']) > 0:
                     image_url = playlist_data['images'][0]['url']
                 
-                # Add to persistent blacklist with image URL
                 add_to_blacklist(playlist_id, playlist_name, image_url)
                 
                 return jsonify({
@@ -545,6 +525,64 @@ def remove_from_blacklist_route(playlist_id):
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/clear_database')
+def clear_database_route():
+    """Clear all data from the database"""
+    if 'access_token' not in session:
+        return redirect('/login')
+    
+    try:
+        # Import and run the clear_database module
+        import clear_database
+        import importlib
+        importlib.reload(clear_database)  # Reload to get fresh execution
+        
+        return """
+        <html>
+        <head>
+            <title>Database Cleared</title>
+            <style>
+                body {{
+                    background-color: #121212;
+                    color: #FFFFFF;
+                    font-family: Arial, sans-serif;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    height: 100vh;
+                    flex-direction: column;
+                }}
+                h1 {{ color: #1DB954; }}
+                a {{
+                    color: #1DB954;
+                    text-decoration: none;
+                    font-weight: bold;
+                    padding: 10px 20px;
+                    border: 2px solid #1DB954;
+                    border-radius: 5px;
+                    margin-top: 20px;
+                    display: inline-block;
+                }}
+                a:hover {{
+                    background-color: #1DB954;
+                    color: white;
+                }}
+            </style>
+        </head>
+        <body>
+            <h1>✓ Database Cleared Successfully</h1>
+            <p>All songs, artists, and albums have been deleted.</p>
+            <a href='/database_values'>Return to Dashboard</a>
+        </body>
+        </html>
+        """
+    except Exception as e:
+        return f"""
+        <h1>Error Clearing Database</h1>
+        <p>{str(e)}</p>
+        <p><a href='/database_values'>Go Back</a></p>
+        """
 
 @app.route('/database_values')
 def database_values():
@@ -609,7 +647,6 @@ def database_values():
     except Exception as e:
         print(f"Error fetching playlists: {e}")
     
-    # Retrieve data from MySQL database
     db_songs = get_all_songs()
     db_artists = get_all_artists()
     db_albums = get_all_albums()
@@ -689,7 +726,7 @@ def database_values():
     total_album_blacklisted_time_ms = sum(album['blacklisted_time_ms'] for album in album_list)
     total_album_blacklisted_time_formatted = f"{total_album_blacklisted_time_ms // 60000}:{(total_album_blacklisted_time_ms % 60000) // 1000:02d}"
     
-    # Get blacklist from persistent storage
+   
     blacklist = get_blacklist()
     
     # Build HTML response with tabs
@@ -1186,6 +1223,12 @@ def database_values():
             window.location.href = '/sync_recent?limit=' + limit;
         }}
         
+        function clearDatabase() {{
+            if (confirm('Are you sure you want to clear the entire database? This will delete ALL songs, artists, and albums data. This action cannot be undone!')) {{
+                window.location.href = '/clear_database';
+            }}
+        }}
+        
         function sortCards(containerId, sortBy) {{
             var container = document.getElementById(containerId);
             var cards = Array.from(container.getElementsByClassName('top-item-card'));
@@ -1385,8 +1428,20 @@ def database_values():
     
     <h1 class="main-title">Welcome to Kungungalacorgus.stats!</h1>
     
+    <!-- Clear Database Button -->
+    <div style="text-align: center; margin: 15px 0;">
+        <button onclick="clearDatabase()" style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px;">
+            🗑️ Clear Database
+        </button>
+        <p style="font-size: 12px; color: #888; margin: 5px 0 0 0;">⚠️ This will delete ALL your data!</p>
+    </div>
+    
     <div class="blacklist-container" style="margin: 20px 0; padding: 15px; border: 2px solid #1DB954; border-radius: 8px; background-color: #1e1e1e;">
         <h3 style="margin-top: 0;">🚫 Blacklist</h3>
+        <p style="color: #ffa500; font-size: 14px; margin-bottom: 15px; padding: 10px; background-color: #2a2a2a; border-radius: 4px;">
+            ⚠️ <strong>Important:</strong> Blacklisted data will only be collected for songs played <em>after</em> adding the playlist to the blacklist. 
+            This does not work retroactively unless you clear the database and reload all songs.
+        </p>
         <form onsubmit="addToBlacklist(event)" style="margin-bottom: 15px;">
             <label for="playlist_url" style="font-weight: bold;">Playlist URL or ID:</label>
             <input type="text" id="playlist_url" name="playlist_url" placeholder="https://open.spotify.com/playlist/..." style="width: 400px; padding: 8px; margin: 0 10px; font-size: 14px;">
@@ -1450,11 +1505,12 @@ def database_values():
                     <span class="time-format-label">d/h/m</span>
                 </div>
                 <div>
-                    <label for="syncLimit" style="font-weight: bold; margin-right: 10px;">Sync songs (1-50):</label>
+                    <label for="syncLimit" style="font-weight: bold; margin-right: 10px;">Load songs (1-50):</label>
                     <input type="number" id="syncLimit" min="1" max="50" value="10" style="width: 70px; padding: 8px; font-size: 14px;">
                     <button onclick="syncSongs()" style="padding: 8px 16px; background-color: #1DB954; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px; margin-left: 10px;">
-                        🔄 Sync
+                        📥 Load
                     </button>
+                    <p style="font-size: 12px; color: #888; margin: 5px 0 0 0; font-style: italic;">Can be used multiple times to load more history</p>
                 </div>
             </div>
         </div>
@@ -1719,7 +1775,7 @@ def database_values():
         </div>
     """
     
-    for idx, artist in enumerate(artist_list[:50], 1):  # Top 50 artists
+    for idx, artist in enumerate(artist_list[:50], 1):  
         # Use actual artist image or fallback to SVG placeholder
         img_url = artist.get('image_url') or "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' fill='%231DB954'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='35' fill='white'%3E🎤%3C/text%3E%3C/svg%3E"
         
@@ -1785,7 +1841,7 @@ def database_values():
         </div>
     """
     
-    for idx, album in enumerate(album_list[:50], 1):  # Top 50 albums
+    for idx, album in enumerate(album_list[:50], 1): 
         # Use actual album image or fallback to SVG placeholder
         img_url = album.get('image_url') or "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' fill='%231DB954'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='35' fill='white'%3E💿%3C/text%3E%3C/svg%3E"
         
@@ -1844,11 +1900,9 @@ def refresh_token():
     
     expires_at = datetime.now().timestamp() + new_token_info['expires_in']
     session['access_token'] = new_token_info['access_token']
-    # Spotify doesn't always return a new refresh_token, keep the old one if not provided
     session['refresh_token'] = new_token_info.get('refresh_token', session['refresh_token'])
     session['expires_at'] = expires_at
     
-    # Save token to file for background job
     save_token_to_file(new_token_info['access_token'], session['refresh_token'], expires_at)
     
     return redirect('/menu')
