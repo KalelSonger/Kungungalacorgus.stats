@@ -34,15 +34,14 @@ REDIRECT_URI = os.getenv('REDIRECT_URI', f'https://{NGROK_DOMAIN}/callback')
 API_BASE_URL = 'https://api.spotify.com/v1'
 TOKEN_FILE = 'spotify_token.json'
 
-# Initialize database on startup
+# Initialize database
 init_database()
 
 # Create background scheduler
 scheduler = BackgroundScheduler()
 scheduler.start()
-
+#Save access token info to file 
 def save_token_to_file(access_token, refresh_token, expires_at):
-    """Save access token info to file for background job"""
     try:
         with open(TOKEN_FILE, 'w') as f:
             json.dump({
@@ -52,9 +51,9 @@ def save_token_to_file(access_token, refresh_token, expires_at):
             }, f)
     except Exception as e:
         print(f"Error saving token: {e}")
-
+#Load access token info from file
 def load_token_from_file():
-    """Load access token info from file"""
+    
     try:
         if os.path.exists(TOKEN_FILE):
             with open(TOKEN_FILE, 'r') as f:
@@ -62,9 +61,8 @@ def load_token_from_file():
     except Exception as e:
         print(f"Error loading token: {e}")
     return None
-
+#Refresh the access token using the refresh token
 def refresh_token_in_background():
-    """Refresh the access token using the refresh token"""
     token_data = load_token_from_file()
     if not token_data:
         return None
@@ -104,9 +102,9 @@ def start_ngrok():
         subprocess.Popen([ngrok_path, 'http', '5000', f'--domain={NGROK_DOMAIN}'], 
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         time.sleep(2)
-        print("✓ ngrok tunnel started successfully")
+        print("ngrok tunnel started successfully")
         print(f"   App available at: https://{NGROK_DOMAIN}")
-        print(f"\n   IMPORTANT: You must configure ngrok authtoken on their machine:")
+        print(f"\n   IMPORTANT: You must configure ngrok authtoken on your machine:")
         print(f"   ngrok config add-authtoken 2vxIYJpjk30G6C6CWl6NKRT8aZx_6ZubgvFvfvquPBLbohmwz")
         print(f"\n   See SETUP.md for full instructions.\n")
     except Exception as e:
@@ -114,14 +112,13 @@ def start_ngrok():
         print(f"   Make sure ngrok is installed. See SETUP.md for instructions.")
 
 start_ngrok()
-
+#Background job to sync recent plays
 def sync_recent_plays_background():
-    """Background job to sync recent plays - runs every 2 minutes"""
     print(f"[{datetime.now().strftime('%H:%M:%S')}] Background sync job started...")
     try:
         token_data = load_token_from_file()
         if not token_data:
-            print("⚠ No token file found - please log in through the web interface first")
+            print("!!! No token file found - please log in through the web interface first")
             return
         
         # Check if token expired and refresh if needed

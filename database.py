@@ -9,12 +9,18 @@ load_dotenv()
 def create_database_if_not_exists():
     """Create the database and user if they don't exist"""
     try:
+        # Get password from environment
+        db_password = os.getenv('DB_PASSWORD', '')
+        # Treat placeholder text as empty password
+        if db_password in ['your_mysql_root_password_here', 'YOUR_PASSWORD_HERE', 'password']:
+            db_password = ''
+        
         # Connect without specifying database
         connection = mysql.connector.connect(
             host=os.getenv('DB_HOST', 'localhost'),
             port=int(os.getenv('DB_PORT', 3306)),
             user='root',  # Need root to create database
-            password=os.getenv('DB_PASSWORD', '')
+            password=db_password
         )
         
         cursor = connection.cursor()
@@ -42,18 +48,28 @@ def create_database_if_not_exists():
         return True
         
     except Error as e:
-        # Auto-creation failed - database likely already exists or wrong root password
+        # Auto-creation failed - could be wrong password or database already exists
+        error_msg = str(e)
+        if "Access denied" in error_msg:
+            print(f"⚠ Could not connect as root user. If your MySQL has a password, set DB_PASSWORD in .env")
+            print(f"  If your MySQL has no password, try: DB_PASSWORD= (blank after equals sign)")
         # This is fine, will try connecting with regular credentials next
         return False
 
 def get_db_connection():
     """Create and return a MySQL database connection"""
     try:
+        # Get password from environment
+        db_password = os.getenv('DB_PASSWORD', '')
+        # Treat placeholder text as empty password
+        if db_password in ['your_mysql_root_password_here', 'YOUR_PASSWORD_HERE', 'password']:
+            db_password = ''
+            
         connection = mysql.connector.connect(
             host=os.getenv('DB_HOST', 'localhost'),
             port=int(os.getenv('DB_PORT', 3306)),
             user=os.getenv('DB_USER', 'root'),
-            password=os.getenv('DB_PASSWORD', ''),
+            password=db_password,
             database=os.getenv('DB_NAME', 'spotifyDatabase')
         )
         return connection
