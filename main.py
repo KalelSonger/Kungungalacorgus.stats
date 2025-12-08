@@ -1505,7 +1505,7 @@ def database_values():
                     <span class="time-format-label">Show Blacklisted</span>
                 </div>
                 <div class="time-format-wrapper">
-                    <span class="time-format-label">m:s</span>
+                    <span class="time-format-label">Listen Time: m:s</span>
                     <label class="time-format-switch" for="time-format-toggle-stats">
                         <input type="checkbox" id="time-format-toggle-stats" onchange="toggleTimeFormat('time-format-toggle-stats')">
                         <div class="slider"></div>
@@ -1705,7 +1705,7 @@ def database_values():
                     </label>
                 </div>
                 <div class="time-format-wrapper">
-                    <span class="time-format-label">m:s</span>
+                    <span class="time-format-label">Listen Time: m:s</span>
                     <label class="time-format-switch" for="time-format-toggle">
                         <input type="checkbox" id="time-format-toggle" onchange="toggleTimeFormat('time-format-toggle')">
                         <div class="slider"></div>
@@ -1772,7 +1772,7 @@ def database_values():
                     </label>
                 </div>
                 <div class="time-format-wrapper">
-                    <span class="time-format-label">m:s</span>
+                    <span class="time-format-label">Listen Time: m:s</span>
                     <label class="time-format-switch" for="time-format-toggle-artists">
                         <input type="checkbox" id="time-format-toggle-artists" onchange="toggleTimeFormat('time-format-toggle-artists')">
                         <div class="slider"></div>
@@ -1838,7 +1838,7 @@ def database_values():
                     </label>
                 </div>
                 <div class="time-format-wrapper">
-                    <span class="time-format-label">m:s</span>
+                    <span class="time-format-label">Listen Time: m:s</span>
                     <label class="time-format-switch" for="time-format-toggle-albums">
                         <input type="checkbox" id="time-format-toggle-albums" onchange="toggleTimeFormat('time-format-toggle-albums')">
                         <div class="slider"></div>
