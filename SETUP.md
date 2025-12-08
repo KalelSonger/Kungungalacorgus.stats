@@ -1,38 +1,30 @@
 # Kungungalacorgus.stats Setup Instructions
 
-A Spotify listening statistics tracker with blacklist functionality for filtering out specific playlists from your stats.
+A Spotify listening statistics tracker with blacklist functionality.
 
-## Features
-- Track song, artist, and album listen counts and total listening time
-- Automatic background sync every 2 minutes
-- Blacklist system to exclude specific playlists from statistics
-- View top songs, artists, and albums
-- Toggle visibility of blacklisted statistics
-- Public access via ngrok tunnel
+**Note**: This application comes pre-configured with Spotify API credentials and ngrok settings. You only need to set up the database and run the application.
 
 ## Prerequisites
-- Python 3.10+
-- MySQL Server 8.0+
-- ngrok account (free tier works)
-- Spotify account
-- Git (optional, for cloning)
 
-## Installation
+- **Python 3.10+** - Download from https://www.python.org/downloads/
+- **MySQL Server 8.0+** - Download from https://dev.mysql.com/downloads/installer/
+- **Spotify Account** - Free or Premium (login required to use the app)
+
+## Installation Steps
 
 ### 1. Install MySQL Server
 
 #### Windows
-- Download MySQL Installer from: https://dev.mysql.com/downloads/installer/
-- Run the installer and select "MySQL Server" during setup
-- During configuration, set a root password (you'll need this later)
-- Start MySQL Server from Windows Services
+1. Download MySQL Installer from https://dev.mysql.com/downloads/installer/
+2. Run the installer and select "MySQL Server"
+3. Set a root password during configuration (remember this!)
+4. Start MySQL Server from Windows Services
 
 #### MacOS
 ```bash
 brew install mysql
 brew services start mysql
-# Secure your installation
-mysql_secure_installation
+mysql_secure_installation  # Follow prompts to set root password
 ```
 
 #### Linux (Ubuntu/Debian)
@@ -40,39 +32,40 @@ mysql_secure_installation
 sudo apt-get update
 sudo apt-get install mysql-server
 sudo systemctl start mysql
-sudo systemctl enable mysql
-# Secure your installation
-sudo mysql_secure_installation
+sudo mysql_secure_installation  # Follow prompts to set root password
 ```
 
-### 2. Configure MySQL Database
+### 2. Create the Database
 
-After installing MySQL, create the database:
+Login to MySQL with your root password:
 
 ```bash
-# Login to MySQL (use your root password)
 mysql -u root -p
 ```
 
-Then run these commands in the MySQL shell:
+Run these commands in the MySQL prompt:
 
 ```sql
 CREATE DATABASE spotifyDatabase;
-CREATE USER 'spotify_user'@'localhost' IDENTIFIED BY 'your_password_here';
+CREATE USER 'spotify_user'@'localhost' IDENTIFIED BY 'Spotify123!';
 GRANT ALL PRIVILEGES ON spotifyDatabase.* TO 'spotify_user'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 ```
 
-Then import the database schema:
+**Note**: The password `Spotify123!` is pre-configured in the `.env` file. You can change it if desired, but make sure to update `.env` accordingly.
+
+Import the database schema:
 
 ```bash
 mysql -u root -p spotifyDatabase < Stats.sql
 ```
 
-### 3. Set Up Python Virtual Environment
+### 3. Install Python Dependencies
 
-**Windows:**
+The application requires a virtual environment with specific packages.
+
+#### Windows
 ```powershell
 # Create virtual environment
 python -m venv .venv
@@ -84,7 +77,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-**MacOS/Linux:**
+#### MacOS/Linux
 ```bash
 # Create virtual environment
 python3 -m venv .venv
@@ -96,239 +89,198 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Configure Environment Variables
+### 4. Verify Configuration
 
-Create a `.env` file in the project root directory:
+The `.env` file is already configured with:
+- **Spotify API credentials** (no setup needed)
+- **ngrok domain and authtoken** (pre-configured)
+- **Database settings** (default: `spotify_user` / `Spotify123!`)
 
-```bash
-# Copy the example file
-cp .env.example .env
-```
-
-Edit `.env` and fill in your credentials:
-
-```env
-# Spotify API Credentials (from https://developer.spotify.com/dashboard)
-CLIENT_ID=your_spotify_client_id
-CLIENT_SECRET=your_spotify_client_secret
-REDIRECT_URI=https://your-ngrok-domain.ngrok-free.app/callback
-
-# ngrok Configuration (from https://dashboard.ngrok.com)
-NGROK_AUTHTOKEN=your_ngrok_authtoken
-NGROK_DOMAIN=your-ngrok-domain.ngrok-free.app
-
-# MySQL Database Configuration
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=spotify_user
-DB_PASSWORD=your_password_here
-DB_NAME=spotifyDatabase
-```
-
-### 5. Install and Configure ngrok
-
-#### Windows
-**Install ngrok:**
-```powershell
-winget install ngrok
-# Or download from https://ngrok.com/download
-```
-
-**Configure ngrok with your authtoken:**
-```powershell
-ngrok config add-authtoken YOUR_AUTHTOKEN_HERE
-```
-
-#### MacOS
-**Install ngrok:**
-```bash
-brew install ngrok
-```
-
-**Configure ngrok:**
-```bash
-ngrok config add-authtoken YOUR_AUTHTOKEN_HERE
-```
-
-#### Linux
-**Install ngrok:**
-```bash
-# Download from https://ngrok.com/download
-curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-sudo apt update && sudo apt install ngrok
-```
-
-**Configure ngrok:**
-```bash
-ngrok config add-authtoken YOUR_AUTHTOKEN_HERE
-```
-
-### 6. Set Up Spotify Developer App
-
-1. Go to https://developer.spotify.com/dashboard
-2. Click "Create an App"
-3. Fill in app name and description
-4. Note your **Client ID** and **Client Secret**
-5. Click "Edit Settings"
-6. Add your ngrok URL to **Redirect URIs**: `https://your-domain.ngrok-free.app/callback`
-7. Save settings
-8. Update your `.env` file with these credentials
+**Only edit `.env` if you changed the database password in Step 2.**
 
 ## Running the Application
 
-### Windows
+### Option 1: Using the Convenience Script (Windows)
+
 ```powershell
-# Make sure virtual environment is activated
+.\run.ps1
+```
+
+This script:
+- Sets UTF-8 encoding for proper character display
+- Starts Flask server
+- Automatically stops when you press Ctrl+C
+
+### Option 2: Running Directly
+
+#### Windows
+```powershell
+# Activate virtual environment
 .\.venv\Scripts\Activate.ps1
 
 # Run the app
 python main.py
-
-# Or use the convenience script
-.\run.ps1
 ```
 
-### MacOS/Linux
+#### MacOS/Linux
 ```bash
-# Make sure virtual environment is activated
+# Activate virtual environment
 source .venv/bin/activate
 
 # Run the app
 python3 main.py
 ```
 
-The app will:
-1. Initialize MySQL database tables automatically
-2. Start ngrok tunnel on your configured domain
-3. Start Flask server on port 5000
-4. Begin background sync (checks every 2 minutes)
+### What Happens When You Run
 
-### Access the App
+The application will:
+1. ✓ Connect to MySQL database
+2. ✓ Auto-create tables if they don't exist
+3. ✓ Start ngrok tunnel at https://easily-crankier-coleman.ngrok-free.dev
+4. ✓ Start Flask server on port 5000
+5. ✓ Begin background sync (every 2 minutes)
 
-Visit your ngrok URL in a browser:
+You'll see output like:
 ```
-https://your-domain.ngrok-free.app
+✓ Connected to database successfully (8 tables found)
+✓ ngrok tunnel started successfully
+   App available at: https://easily-crankier-coleman.ngrok-free.dev
+ * Running on http://127.0.0.1:5000
 ```
 
-Click "Login with Spotify" to authenticate and start tracking your listening statistics.
+### Accessing the Application
 
-## Using the Blacklist Feature
+Open your browser and visit:
+```
+https://easily-crankier-coleman.ngrok-free.dev
+```
 
-The blacklist allows you to exclude specific playlists from your statistics tracking.
+**From any device** (phone, tablet, another computer):
+- The ngrok URL works from anywhere with internet
+- No port forwarding or firewall configuration needed
 
-### Adding Playlists to Blacklist
+### First Time Login
 
-1. Navigate to the **Blacklist** tab in the app
-2. Paste a Spotify playlist URL or URI:
-   - URL format: `https://open.spotify.com/playlist/PLAYLIST_ID`
-   - URI format: `spotify:playlist:PLAYLIST_ID`
-3. Click "Add to Blacklist"
-4. The playlist will appear in your blacklist
+1. Click **"Login with Spotify"**
+2. Authorize the app to access your Spotify data
+3. You'll be redirected back to the dashboard
+4. The app starts tracking your listening history automatically
+
+## Using the Application
+
+### Statistics Tab
+- View all tracked songs with play counts and listening time
+- Toggle "Show Blacklisted Listens" to see/hide blacklisted data
+- Click "Sync Songs" to manually fetch recent tracks
+
+### Top Songs/Artists/Albums Tabs
+- View your most-played content
+- Toggle "Show Blacklisted" to display blacklisted statistics
+- Only shows items with at least 1 regular (non-blacklisted) play
+
+### Blacklist Tab
+- Add playlists you want to exclude from regular statistics
+- Paste Spotify playlist URL: `https://open.spotify.com/playlist/...`
+- Or Spotify URI: `spotify:playlist:...`
+- Remove playlists by clicking the red X
 
 ### How Blacklisting Works
-
 - Songs played from blacklisted playlists are tracked separately
-- **Regular listens/time**: Songs played from albums, non-blacklisted playlists, etc.
-- **Blacklisted listens/time**: Songs played from blacklisted playlists
-- Top tabs (Songs, Artists, Albums) only show items with regular listens > 0
-- Use the "Show Blacklisted" toggle to view blacklisted statistics
+- **Regular stats**: Music from albums, non-blacklisted playlists
+- **Blacklisted stats**: Music from blacklisted playlists only
+- Use for study playlists, sleep music, etc. that skew your real preferences
 
-### Viewing Blacklisted Stats
+## Stopping the Application
 
-In the **Top Songs**, **Top Artists**, and **Top Albums** tabs:
-- Toggle "Show Blacklisted" to reveal blacklisted listens and time
-- All three toggles are synchronized
-- Toggle state persists across page reloads
+Press **Ctrl+C** in the terminal where the app is running.
 
-In the **Statistics** tab:
-- Use the "Show Blacklisted Listens" toggle to show/hide blacklisted columns
-- View comprehensive statistics for all tracked songs
+The app will automatically:
+- Stop the Flask server
+- Close the ngrok tunnel
+- Save all data to the database
+
+## Resetting Your Data
+
+To clear all statistics and start fresh:
+
+```bash
+# Windows
+.\.venv\Scripts\python.exe clear_database.py
+
+# MacOS/Linux
+.venv/bin/python clear_database.py
+```
+
+This will delete all songs, artists, albums, and relationships from the database.
 
 ## Troubleshooting
 
-### Database Connection Issues
-- Verify MySQL is running: `mysql -u root -p`
-- Check credentials in `.env` file match your MySQL setup
-- Ensure database `spotifyDatabase` exists
+### "Can't connect to database"
+- Verify MySQL is running
+- Check that `spotifyDatabase` exists: `mysql -u root -p -e "SHOW DATABASES;"`
+- Verify password in `.env` matches what you set in Step 2
 
-### ngrok Connection Failed
-- Run: `ngrok config add-authtoken YOUR_AUTHTOKEN`
-- Check if port 5000 is already in use
-- Verify ngrok domain in `.env` matches your ngrok account
+### "Port 5000 already in use"
+- Another application is using port 5000
+- Stop the other application or modify the port in `main.py`
+- Look for `app.run(port=5000)` and change to another port
 
-### Spotify Authentication Error
-- Verify CLIENT_ID and CLIENT_SECRET in `.env`
-- Check Redirect URI in Spotify Dashboard matches your ngrok URL exactly
-- Ensure ngrok tunnel is running before attempting login
+### "Module not found" errors
+- Make sure virtual environment is activated
+- Run `pip install -r requirements.txt` again
+- Check that you're using the correct Python version (3.10+)
 
-### Background Sync Not Working
-- Check Flask terminal output for error messages
-- Verify Spotify token hasn't expired (re-login if needed)
-- Look for "Background sync job started..." messages every 2 minutes
+### "ngrok authentication failed"
+- The ngrok authtoken is pre-configured in `.env`
+- If you see this error, verify `.env` file exists and contains `NGROK_AUTHTOKEN`
 
-### Module Not Found Errors
-- Ensure virtual environment is activated
-- Run: `pip install -r requirements.txt`
-- Try: `pip install --upgrade pip`
+### Songs not appearing after listening
+- Wait 2 minutes for the automatic background sync
+- Or click "Sync Songs" button in the Statistics tab
+- Check terminal output for error messages
 
-### Port 5000 Already in Use
-- Stop other Flask applications
-- Or modify port in `main.py`: `app.run(host='0.0.0.0', port=XXXX, debug=True)`
+### Blacklist not working
+- Only playlist-based plays can be blacklisted
+- Playing from album/artist page won't trigger blacklist
+- Must play from the actual playlist you blacklisted
 
-### Blacklist Not Tracking Correctly
-- Clear database and resync: `python clear_database.py`
-- Remove sync timestamp: `del last_sync.txt` (Windows) or `rm last_sync.txt` (Unix)
-- Restart the app and click "Sync Songs"
-- Only playlist-based plays can be blacklisted (not album/artist plays)
+### Website shows "502 Bad Gateway"
+- Make sure `python main.py` is still running
+- Check terminal for error messages
+- Restart the application
 
-## Application Structure
-
-```
-Kungungalacorgus.stats/
-├── main.py                 # Flask application with Spotify OAuth and UI
-├── database.py            # MySQL database abstraction layer
-├── requirements.txt       # Python dependencies
-├── SETUP.md              # This file
-├── Stats.sql             # Database schema
-├── clear_database.py     # Utility to reset database
-├── run.ps1              # Windows convenience script
-├── .env                 # Environment variables (create from .env.example)
-├── .env.example         # Template for environment configuration
-├── blacklist.json       # Blacklisted playlist storage
-├── spotify_token.json   # Cached Spotify OAuth tokens
-├── last_sync.txt        # Last sync timestamp
-└── .venv/              # Python virtual environment
-```
-
-## Advanced Features
-
-### Manual Sync
-- Click "Sync Songs" button in the Statistics tab
-- Specify limit (1-50) for number of recent tracks to fetch
-- Useful after adding new playlists to blacklist
+## Technical Details
 
 ### Background Sync
-- Runs automatically every 2 minutes
+- Runs every 2 minutes automatically
+- Fetches up to 50 most recent tracks
 - Only processes new tracks (no duplicates)
-- Uses `last_sync.txt` to track last sync timestamp
+- Uses `last_sync.txt` to track last sync time
 
-### Database Management
-- Clear all data: `python clear_database.py`
-- Database auto-creates tables on first run
-- Schema automatically updates when new columns are needed
+### Database Structure
+- **Songs**: Track ID, title, length, play counts, times
+- **Artists**: Artist ID, name, play counts, times  
+- **Albums**: Album ID, title, release year, play counts, times
+- **Blacklist columns**: Separate counters for blacklisted plays
 
-## Security Notes
+### Pre-configured Settings
+- **Spotify Client ID**: 2a061e08a3f94fd68b36a41fc9922a3b
+- **ngrok Domain**: easily-crankier-coleman.ngrok-free.dev
+- **Database**: spotifyDatabase (user: spotify_user)
 
-- Never commit `.env` file to version control
-- Keep `spotify_token.json` private
-- Rotate Spotify Client Secret if exposed
-- Use ngrok's free tier only for development/personal use
+These are ready to use - no additional configuration needed.
+
+## System Requirements
+
+- **RAM**: 512 MB minimum
+- **Disk Space**: 100 MB for application + database storage
+- **Internet**: Required for Spotify API and ngrok tunnel
+- **Browser**: Any modern browser (Chrome, Firefox, Safari, Edge)
 
 ## Support
 
-For issues or questions:
-- Check the Troubleshooting section above
-- Review Flask terminal output for error messages
-- Verify all prerequisites are installed correctly
-- Ensure `.env` file is properly configured
+If you encounter issues:
+1. Check the Troubleshooting section above
+2. Review terminal output for error messages
+3. Verify all prerequisites are installed
+4. Ensure `.env` file exists with correct settings

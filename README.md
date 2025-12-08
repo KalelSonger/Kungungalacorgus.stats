@@ -14,45 +14,24 @@ Kungungalacorgus.stats is a Flask-based web application that tracks and visualiz
 - **Top Charts**: View your most played songs, artists, and albums
 - **Time Tracking**: Monitor total listening time for songs, artists, and albums
 - **Toggle Visibility**: Show or hide blacklisted statistics on demand
-- **Public Access**: Share your stats via ngrok tunnel
+- **Public Access**: Accessible via ngrok tunnel from any device
 - **Persistent Storage**: MySQL database for reliable data retention
+
+## Prerequisites
+
+- Python 3.10 or higher
+- MySQL Server 8.0 or higher
+- Spotify account (free or premium)
 
 ## Quick Start
 
-1. **Install Prerequisites**
-   - Python 3.10+
-   - MySQL Server 8.0+
-   - ngrok account
+See [SETUP.md](SETUP.md) for complete installation instructions.
 
-2. **Set Up Database**
-   ```bash
-   mysql -u root -p
-   CREATE DATABASE spotifyDatabase;
-   ```
-
-3. **Configure Environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your credentials
-   ```
-
-4. **Install Dependencies**
-   ```bash
-   python -m venv .venv
-   .venv\Scripts\activate  # Windows
-   # or: source .venv/bin/activate  # Unix
-   pip install -r requirements.txt
-   ```
-
-5. **Run the Application**
-   ```bash
-   python main.py
-   ```
-
-6. **Access via Browser**
-   - Visit your ngrok URL
-   - Login with Spotify
-   - Start tracking!
+**TL;DR:**
+1. Install MySQL and create `spotifyDatabase`
+2. Configure `.env` file with database password
+3. Run `python main.py` (or `.\run.ps1` on Windows)
+4. Visit the ngrok URL and login with Spotify
 
 ## Blacklist Feature
 
@@ -75,6 +54,15 @@ These can skew your "real" listening statistics. The blacklist feature lets you 
    - **Blacklisted listens/time**: Background/utility listening
 4. Toggle visibility in any tab to show/hide blacklisted stats
 
+## Technology Stack
+
+- **Backend**: Flask (Python)
+- **Database**: MySQL 8.0+
+- **Authentication**: Spotify OAuth 2.0
+- **Scheduling**: APScheduler (background sync)
+- **Tunneling**: ngrok (public access)
+- **Frontend**: HTML/CSS/JavaScript
+
 ## Project Structure
 
 ```
@@ -89,45 +77,10 @@ These can skew your "real" listening statistics. The blacklist feature lets you 
 └── .env                # Environment configuration
 ```
 
-## Technology Stack
-
-- **Backend**: Flask (Python)
-- **Database**: MySQL 8.0+
-- **Authentication**: Spotify OAuth 2.0
-- **Scheduling**: APScheduler (background sync)
-- **Tunneling**: ngrok (public access)
-- **Frontend**: HTML/CSS/JavaScript (embedded)
-
 ## Documentation
 
-- [SETUP.md](SETUP.md) - Complete installation and configuration guide
-- [Stats.sql](Stats.sql) - Database schema and structure
+- [SETUP.md](SETUP.md) - Installation and setup guide
 
-## Screenshots
+## Authors
 
-### Statistics Dashboard
-View all your tracked songs with listen counts and total time played.
-
-### Top Songs/Artists/Albums
-Discover your most-played content with sortable charts.
-
-### Blacklist Management
-Easily add or remove playlists from your blacklist.
-
-## Contributing
-
-This is a personal project, but suggestions and bug reports are welcome via issues.
-
-## License
-
-MIT License - See LICENSE file for details
-
-## Author
-
-KalelSonger
-
-## Acknowledgments
-
-- Spotify Web API for providing comprehensive music data
-- ngrok for easy public access tunneling
-- Flask community for excellent documentation
+Kalel Songer
