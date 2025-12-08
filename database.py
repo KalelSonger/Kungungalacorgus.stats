@@ -75,26 +75,30 @@ def create_indexes():
     try:
         cursor = conn.cursor()
         
-        # Songs indexes
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_s_id ON Songs(S_ID)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_s_listens ON Songs(S_Listens)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_s_listen_time ON Songs(S_Listen_Time)")
+        # Try to create each index, ignore if it already exists
+        indexes = [
+            "CREATE INDEX idx_s_id ON Songs(S_ID)",
+            "CREATE INDEX idx_s_listens ON Songs(S_Listens)",
+            "CREATE INDEX idx_s_listen_time ON Songs(S_Listen_Time)",
+            "CREATE INDEX idx_a_id ON Artists(A_ID)",
+            "CREATE INDEX idx_a_listens ON Artists(A_Listens)",
+            "CREATE INDEX idx_a_listen_time ON Artists(A_Listen_Time)",
+            "CREATE INDEX idx_album_id ON Albums(A_ID)",
+            "CREATE INDEX idx_album_listen_time ON Albums(A_Listen_Time)"
+        ]
         
-        # Artists indexes
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_a_id ON Artists(A_ID)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_a_listens ON Artists(A_Listens)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_a_listen_time ON Artists(A_Listen_Time)")
-        
-        # Albums indexes
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_album_id ON Albums(A_ID)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_album_listen_time ON Albums(A_Listen_Time)")
+        for index_sql in indexes:
+            try:
+                cursor.execute(index_sql)
+            except Error as e:
+                if e.errno != 1061:
+                    pass
         
         conn.commit()
         cursor.close()
-        print("Database indexes created successfully")
+        print("✓ Database indexes created successfully")
         return True
     except Error as e:
-        print(f"Note: Could not create indexes (may already exist): {e}")
         return False
     finally:
         if conn.is_connected():
