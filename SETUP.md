@@ -1,9 +1,20 @@
 # Kungungalacorgus.stats Setup Instructions
 
+A Spotify listening statistics tracker with blacklist functionality for filtering out specific playlists from your stats.
+
+## Features
+- Track song, artist, and album listen counts and total listening time
+- Automatic background sync every 2 minutes
+- Blacklist system to exclude specific playlists from statistics
+- View top songs, artists, and albums
+- Toggle visibility of blacklisted statistics
+- Public access via ngrok tunnel
+
 ## Prerequisites
 - Python 3.10+
-- ngrok
 - MySQL Server 8.0+
+- ngrok account (free tier works)
+- Spotify account
 - Git (optional, for cloning)
 
 ## Installation
@@ -59,7 +70,33 @@ Then import the database schema:
 mysql -u root -p spotifyDatabase < Stats.sql
 ```
 
-### 3. Configure Environment Variables
+### 3. Set Up Python Virtual Environment
+
+**Windows:**
+```powershell
+# Create virtual environment
+python -m venv .venv
+
+# Activate virtual environment
+.\.venv\Scripts\Activate.ps1
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+**MacOS/Linux:**
+```bash
+# Create virtual environment
+python3 -m venv .venv
+
+# Activate virtual environment
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 4. Configure Environment Variables
 
 Create a `.env` file in the project root directory:
 
@@ -71,14 +108,14 @@ cp .env.example .env
 Edit `.env` and fill in your credentials:
 
 ```env
-# Spotify API Credentials
-CLIENT_ID=2a061e08a3f94fd68b36a41fc9922a3b
-CLIENT_SECRET=599323f77f88464fbe768772e4d4c716
-REDIRECT_URI=https://easily-crankier-coleman.ngrok-free.dev/callback
+# Spotify API Credentials (from https://developer.spotify.com/dashboard)
+CLIENT_ID=your_spotify_client_id
+CLIENT_SECRET=your_spotify_client_secret
+REDIRECT_URI=https://your-ngrok-domain.ngrok-free.app/callback
 
-# ngrok Configuration
-NGROK_AUTHTOKEN=2vxIYJpjk30G6C6CWl6NKRT8aZx_6ZubgvFvfvquPBLbohmwz
-NGROK_DOMAIN=easily-crankier-coleman.ngrok-free.dev
+# ngrok Configuration (from https://dashboard.ngrok.com)
+NGROK_AUTHTOKEN=your_ngrok_authtoken
+NGROK_DOMAIN=your-ngrok-domain.ngrok-free.app
 
 # MySQL Database Configuration
 DB_HOST=localhost
@@ -88,28 +125,18 @@ DB_PASSWORD=your_password_here
 DB_NAME=spotifyDatabase
 ```
 
-### 4. Install Python Dependencies
-
-**Windows/MacOS:**
-```bash
-pip install -r requirements.txt
-```
-
-**Linux:**
-```bash
-pip3 install -r requirements.txt
-```
-
 ### 5. Install and Configure ngrok
 
 #### Windows
 **Install ngrok:**
-- Download from https://ngrok.com/download
-- Or use: `winget install ngrok`
-
-**Configure ngrok with the authtoken:**
 ```powershell
-ngrok config add-authtoken 2vxIYJpjk30G6C6CWl6NKRT8aZx_6ZubgvFvfvquPBLbohmwz
+winget install ngrok
+# Or download from https://ngrok.com/download
+```
+
+**Configure ngrok with your authtoken:**
+```powershell
+ngrok config add-authtoken YOUR_AUTHTOKEN_HERE
 ```
 
 #### MacOS
@@ -118,103 +145,190 @@ ngrok config add-authtoken 2vxIYJpjk30G6C6CWl6NKRT8aZx_6ZubgvFvfvquPBLbohmwz
 brew install ngrok
 ```
 
-**Configure ngrok with the authtoken:**
+**Configure ngrok:**
 ```bash
-ngrok config add-authtoken 2vxIYJpjk30G6C6CWl6NKRT8aZx_6ZubgvFvfvquPBLbohmwz
+ngrok config add-authtoken YOUR_AUTHTOKEN_HERE
 ```
 
 #### Linux
 **Install ngrok:**
 ```bash
-# Ubuntu/Debian
-sudo apt-get update
-sudo apt-get install ngrok
-
-# Or download from https://ngrok.com/download
-# Extract and move to PATH
-tar xvzf ngrok-v3-stable-linux-amd64.tgz
-sudo mv ngrok /usr/local/bin/ngrok
+# Download from https://ngrok.com/download
+curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+sudo apt update && sudo apt install ngrok
 ```
 
-**Configure ngrok with the authtoken:**
+**Configure ngrok:**
 ```bash
-ngrok config add-authtoken 2vxIYJpjk30G6C6CWl6NKRT8aZx_6ZubgvFvfvquPBLbohmwz
+ngrok config add-authtoken YOUR_AUTHTOKEN_HERE
 ```
 
-This must be done once per machine. This allows the app to use the reserved ngrok domain for a consistent redirect URI.
+### 6. Set Up Spotify Developer App
 
-### 6. Run the App
+1. Go to https://developer.spotify.com/dashboard
+2. Click "Create an App"
+3. Fill in app name and description
+4. Note your **Client ID** and **Client Secret**
+5. Click "Edit Settings"
+6. Add your ngrok URL to **Redirect URIs**: `https://your-domain.ngrok-free.app/callback`
+7. Save settings
+8. Update your `.env` file with these credentials
 
-**Windows:**
+## Running the Application
+
+### Windows
 ```powershell
+# Make sure virtual environment is activated
+.\.venv\Scripts\Activate.ps1
+
+# Run the app
 python main.py
+
+# Or use the convenience script
+.\run.ps1
 ```
 
-**MacOS/Linux:**
+### MacOS/Linux
 ```bash
+# Make sure virtual environment is activated
+source .venv/bin/activate
+
+# Run the app
 python3 main.py
 ```
 
 The app will:
-1. Initialize the MySQL database tables automatically
-2. Start ngrok tunnel
+1. Initialize MySQL database tables automatically
+2. Start ngrok tunnel on your configured domain
 3. Start Flask server on port 5000
-4. Begin background monitoring for new songs (checks every 30 seconds)
+4. Begin background sync (checks every 2 minutes)
 
-The app will:
-- Automatically start ngrok tunnel on `https://easily-crankier-coleman.ngrok-free.dev`
-- Start the Flask server on `http://0.0.0.0:5000` (accessible from any machine)
-- Print "✓ ngrok tunnel started successfully" when ready
+### Access the App
 
-### 4. Access the App
-
-From any computer (local or remote), visit in your browser:
+Visit your ngrok URL in a browser:
 ```
-https://easily-crankier-coleman.ngrok-free.dev
+https://your-domain.ngrok-free.app
 ```
 
-Click "Login with Spotify" to authenticate and view your Spotify statistics.
+Click "Login with Spotify" to authenticate and start tracking your listening statistics.
 
-## Spotify Credentials
+## Using the Blacklist Feature
 
-The app uses the following Spotify API credentials (already configured in the code):
-- CLIENT_ID: `2a061e08a3f94fd68b36a41fc9922a3b`
-- CLIENT_SECRET: `599323f77f88464fbe768772e4d4c716`
-- Redirect URI: `https://easily-crankier-Coleman.ngrok-free.dev/callback`
+The blacklist allows you to exclude specific playlists from your statistics tracking.
 
-These are pre-registered and no additional Spotify setup is needed.
+### Adding Playlists to Blacklist
 
-## Important Notes
+1. Navigate to the **Blacklist** tab in the app
+2. Paste a Spotify playlist URL or URI:
+   - URL format: `https://open.spotify.com/playlist/PLAYLIST_ID`
+   - URI format: `spotify:playlist:PLAYLIST_ID`
+3. Click "Add to Blacklist"
+4. The playlist will appear in your blacklist
 
-- **Each user needs their own Spotify account** - When logging in via the app, you authenticate with your personal Spotify account
-- **The ngrok domain is shared** - All users accessing the app will go through the same ngrok tunnel to the same server
-- **Sessions are isolated** - Each browser/user maintains their own session with their own Spotify data
-- **The authtoken is the same for all machines** - Use the authtoken provided above on every machine that runs this app
+### How Blacklisting Works
+
+- Songs played from blacklisted playlists are tracked separately
+- **Regular listens/time**: Songs played from albums, non-blacklisted playlists, etc.
+- **Blacklisted listens/time**: Songs played from blacklisted playlists
+- Top tabs (Songs, Artists, Albums) only show items with regular listens > 0
+- Use the "Show Blacklisted" toggle to view blacklisted statistics
+
+### Viewing Blacklisted Stats
+
+In the **Top Songs**, **Top Artists**, and **Top Albums** tabs:
+- Toggle "Show Blacklisted" to reveal blacklisted listens and time
+- All three toggles are synchronized
+- Toggle state persists across page reloads
+
+In the **Statistics** tab:
+- Use the "Show Blacklisted Listens" toggle to show/hide blacklisted columns
+- View comprehensive statistics for all tracked songs
 
 ## Troubleshooting
 
-**"No web processes running" or connection refused:**
-- Make sure `python main.py` (or `python3 main.py` on Linux/Mac) is still running
-- Check that ngrok started successfully (look for the "✓" message)
-- Verify the ngrok domain is accessible: visit https://easily-crankier-coleman.ngrok-free.dev
+### Database Connection Issues
+- Verify MySQL is running: `mysql -u root -p`
+- Check credentials in `.env` file match your MySQL setup
+- Ensure database `spotifyDatabase` exists
 
-**ngrok says "authentication failed":**
-- Run: `ngrok config add-authtoken 2vxIYJpjk30G6C6CWl6NKRT8aZx_6ZubgvFvfvquPBLbohmwz`
-- Then restart the app
+### ngrok Connection Failed
+- Run: `ngrok config add-authtoken YOUR_AUTHTOKEN`
+- Check if port 5000 is already in use
+- Verify ngrok domain in `.env` matches your ngrok account
 
-**Spotify redirect URI error:**
-- The redirect URI should match exactly: `https://easily-crankier-coleman.ngrok-free.dev/callback`
-- Check Spotify Developer Dashboard > Your App > Redirect URIs
-- Do not include trailing slashes
+### Spotify Authentication Error
+- Verify CLIENT_ID and CLIENT_SECRET in `.env`
+- Check Redirect URI in Spotify Dashboard matches your ngrok URL exactly
+- Ensure ngrok tunnel is running before attempting login
 
-**Module not found errors (ImportError):**
-- Make sure you ran `pip install -r requirements.txt` (or `pip3` on Linux/Mac)
-- Try upgrading pip: `pip install --upgrade pip`
+### Background Sync Not Working
+- Check Flask terminal output for error messages
+- Verify Spotify token hasn't expired (re-login if needed)
+- Look for "Background sync job started..." messages every 2 minutes
 
-**Port 5000 already in use:**
-- Close any other Flask applications running on port 5000
-- Or modify the port in `main.py` at the bottom (change `app.run(host='0.0.0.0', debug=True)`)
+### Module Not Found Errors
+- Ensure virtual environment is activated
+- Run: `pip install -r requirements.txt`
+- Try: `pip install --upgrade pip`
 
-**Permission denied when running ngrok on Linux:**
-- Make sure ngrok is in your PATH: `which ngrok`
-- Or run with full path: `/usr/local/bin/ngrok http 5000 --domain=easily-crankier-coleman.ngrok-free.dev`
+### Port 5000 Already in Use
+- Stop other Flask applications
+- Or modify port in `main.py`: `app.run(host='0.0.0.0', port=XXXX, debug=True)`
+
+### Blacklist Not Tracking Correctly
+- Clear database and resync: `python clear_database.py`
+- Remove sync timestamp: `del last_sync.txt` (Windows) or `rm last_sync.txt` (Unix)
+- Restart the app and click "Sync Songs"
+- Only playlist-based plays can be blacklisted (not album/artist plays)
+
+## Application Structure
+
+```
+Kungungalacorgus.stats/
+├── main.py                 # Flask application with Spotify OAuth and UI
+├── database.py            # MySQL database abstraction layer
+├── requirements.txt       # Python dependencies
+├── SETUP.md              # This file
+├── Stats.sql             # Database schema
+├── clear_database.py     # Utility to reset database
+├── run.ps1              # Windows convenience script
+├── .env                 # Environment variables (create from .env.example)
+├── .env.example         # Template for environment configuration
+├── blacklist.json       # Blacklisted playlist storage
+├── spotify_token.json   # Cached Spotify OAuth tokens
+├── last_sync.txt        # Last sync timestamp
+└── .venv/              # Python virtual environment
+```
+
+## Advanced Features
+
+### Manual Sync
+- Click "Sync Songs" button in the Statistics tab
+- Specify limit (1-50) for number of recent tracks to fetch
+- Useful after adding new playlists to blacklist
+
+### Background Sync
+- Runs automatically every 2 minutes
+- Only processes new tracks (no duplicates)
+- Uses `last_sync.txt` to track last sync timestamp
+
+### Database Management
+- Clear all data: `python clear_database.py`
+- Database auto-creates tables on first run
+- Schema automatically updates when new columns are needed
+
+## Security Notes
+
+- Never commit `.env` file to version control
+- Keep `spotify_token.json` private
+- Rotate Spotify Client Secret if exposed
+- Use ngrok's free tier only for development/personal use
+
+## Support
+
+For issues or questions:
+- Check the Troubleshooting section above
+- Review Flask terminal output for error messages
+- Verify all prerequisites are installed correctly
+- Ensure `.env` file is properly configured

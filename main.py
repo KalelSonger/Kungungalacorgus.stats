@@ -1,4 +1,4 @@
-import os
+﻿import os
 import requests
 import urllib.parse
 import json
@@ -10,7 +10,7 @@ import shutil
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from flask import Flask, redirect, request, session, jsonify
+from flask import Flask, redirect, request, session, jsonify, url_for
 from datetime import datetime, timedelta
 from database import (
     init_database, insert_or_update_song, insert_or_update_artist,
@@ -138,17 +138,6 @@ def sync_recent_plays_background():
         
         headers = {'Authorization': f"Bearer {access_token}"}
         
-        # First, try to get currently playing track to capture its context
-        current_response = requests.get(API_BASE_URL + '/me/player/currently-playing', headers=headers)
-        current_context = None
-        if current_response.status_code == 200 and current_response.text:
-            current_data = current_response.json()
-            if current_data.get('item') and current_data.get('context'):
-                current_context = {
-                    'track_id': current_data['item']['id'],
-                    'context': current_data.get('context')
-                }
-        
         # Get recently played tracks
         response = requests.get(API_BASE_URL + '/me/player/recently-played?limit=50', headers=headers)
         
@@ -176,12 +165,8 @@ def sync_recent_plays_background():
                     track = item['track']
                     played_at = datetime.fromisoformat(item['played_at'].replace('Z', '+00:00'))
                     
-                    # Try to use current context if this is the currently playing track
-                    context = None
-                    if current_context and track['id'] == current_context['track_id']:
-                        context = current_context['context']
-                    # Note: For historical plays, we won't have context, so they won't be marked as blacklisted
-                    # Only real-time plays will have accurate blacklist tracking
+                    # Get context from the recently-played item itself
+                    context = item.get('context')
                     
                     process_and_store_track(track, played_at, access_token, context)
                 
@@ -208,6 +193,7 @@ def process_and_store_track(track, played_at, access_token, context=None):
     try:
         # Determine if this play is from a blacklisted playlist
         is_blacklisted = False
+        
         if context and context.get('type') == 'playlist':
             playlist_uri = context.get('uri', '')
             # Extract playlist ID from URI (spotify:playlist:ID)
@@ -216,9 +202,8 @@ def process_and_store_track(track, played_at, access_token, context=None):
             if playlist_id:
                 blacklist = get_blacklist()
                 is_blacklisted = any(p['id'] == playlist_id for p in blacklist)
-                if is_blacklisted:
-                    print(f"  🚫 Blacklisted playlist detected: {playlist_id}")
-        print(f"\n[Processing] {track['name']} by {', '.join([a['name'] for a in track['artists']])}")
+        
+        print(f"\n[Processing] {track['name']} by {', '.join([a['name'] for a in track['artists']])} - Blacklisted: {is_blacklisted}")
         
         # Prepare song data
         song_data = {
@@ -480,8 +465,11 @@ def sync_recent():
                 played_at = item['played_at']
                 played_at_dt = datetime.fromisoformat(item['played_at'].replace('Z', '+00:00'))
                 
+                # Get context from the recently-played item
+                context = item.get('context')
+                
                 # Process the track
-                process_and_store_track(track, played_at_dt, session['access_token'])
+                process_and_store_track(track, played_at_dt, session['access_token'], context)
                 processed_count += 1
                 
                 # Track the latest timestamp (only update if this is newer)
@@ -615,8 +603,6 @@ def database_values():
                 image_url = None
                 if playlist.get('images') and len(playlist['images']) > 0:
                     image_url = playlist['images'][0]['url']
-                
-                print(f"Playlist: {playlist['name']}, Image URL: {image_url}")
                 
                 all_playlists.append({
                     'id': playlist['id'],
@@ -1062,6 +1048,48 @@ def database_values():
             }});
         }}
         
+        // Toggle blacklisted stats in Top tabs
+        function toggleBlacklistedStats() {{
+            // Get the toggle that was clicked (event.target) or default to songs toggle
+            var clickedToggle = event && event.target ? event.target : document.getElementById('blacklist-toggle-songs');
+            
+            // Get all toggles
+            var songsToggle = document.getElementById('blacklist-toggle-songs');
+            var artistsToggle = document.getElementById('blacklist-toggle-artists');
+            var albumsToggle = document.getElementById('blacklist-toggle-albums');
+            
+            // Use the clicked toggle's state
+            var showBlacklisted = clickedToggle ? clickedToggle.checked : false;
+            
+            // Sync all toggles to match the clicked one
+            if (songsToggle) songsToggle.checked = showBlacklisted;
+            if (artistsToggle) artistsToggle.checked = showBlacklisted;
+            if (albumsToggle) albumsToggle.checked = showBlacklisted;
+            
+            // Save preference
+            localStorage.setItem('showBlacklistedStats', showBlacklisted ? 'true' : 'false');
+            
+            // Toggle visibility of all blacklisted stat boxes
+            var blacklistedStats = document.querySelectorAll('.blacklisted-stats');
+            blacklistedStats.forEach(function(stat) {{
+                stat.style.display = showBlacklisted ? '' : 'none';
+            }});
+        }}
+        
+        // Load saved blacklisted stats preference for Top tabs
+        function loadBlacklistedStatsPreference() {{
+            var showBlacklistedStats = localStorage.getItem('showBlacklistedStats') === 'true';
+            var songsToggle = document.getElementById('blacklist-toggle-songs');
+            var artistsToggle = document.getElementById('blacklist-toggle-artists');
+            var albumsToggle = document.getElementById('blacklist-toggle-albums');
+            
+            if (songsToggle) songsToggle.checked = showBlacklistedStats;
+            if (artistsToggle) artistsToggle.checked = showBlacklistedStats;
+            if (albumsToggle) albumsToggle.checked = showBlacklistedStats;
+            
+            toggleBlacklistedStats();
+        }}
+        
         // Load saved blacklisted column preference
         function loadBlacklistedPreference() {{
             var showBlacklisted = localStorage.getItem('showBlacklisted') === 'true';
@@ -1213,6 +1241,7 @@ def database_values():
             loadTheme();
             loadTimeFormat();
             loadBlacklistedPreference();
+            loadBlacklistedStatsPreference();
             document.getElementsByClassName("tablinks")[0].click();
         }}
         
@@ -1508,13 +1537,22 @@ def database_values():
                     <option value="time">Total Listen Time</option>
                 </select>
             </div>
-            <div class="time-format-wrapper">
-                <span class="time-format-label">m:s</span>
-                <label class="time-format-switch" for="time-format-toggle">
-                    <input type="checkbox" id="time-format-toggle" onchange="toggleTimeFormat('time-format-toggle')">
-                    <div class="slider"></div>
-                </label>
-                <span class="time-format-label">d/h/m</span>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div class="time-format-wrapper">
+                    <span class="time-format-label">Show Blacklisted</span>
+                    <label class="time-format-switch" for="blacklist-toggle-songs">
+                        <input type="checkbox" id="blacklist-toggle-songs" onchange="toggleBlacklistedStats()">
+                        <div class="slider"></div>
+                    </label>
+                </div>
+                <div class="time-format-wrapper">
+                    <span class="time-format-label">m:s</span>
+                    <label class="time-format-switch" for="time-format-toggle">
+                        <input type="checkbox" id="time-format-toggle" onchange="toggleTimeFormat('time-format-toggle')">
+                        <div class="slider"></div>
+                    </label>
+                    <span class="time-format-label">d/h/m</span>
+                </div>
             </div>
         </div>
     """
@@ -1532,6 +1570,14 @@ def database_values():
                 <div class="item-subtitle">{song['album_title']}</div>
             </div>
             <div class="item-stats">
+                <div class="stat-box blacklisted-stats" style="display: none;">
+                    <div class="stat-value">{song.get('blacklisted_listens', 0)}</div>
+                    <div class="stat-label">Blacklisted Plays</div>
+                </div>
+                <div class="stat-box blacklisted-stats" style="display: none;">
+                    <div class="stat-value time-value" data-ms="{song.get('blacklisted_time_ms', 0)}">{song.get('blacklisted_time_formatted', '0:00')}</div>
+                    <div class="stat-label">Blacklisted Time</div>
+                </div>
                 <div class="stat-box">
                     <div class="stat-value">{song['listen_count']}</div>
                     <div class="stat-label">Plays</div>
@@ -1558,13 +1604,22 @@ def database_values():
                     <option value="time">Total Listen Time</option>
                 </select>
             </div>
-            <div class="time-format-wrapper">
-                <span class="time-format-label">m:s</span>
-                <label class="time-format-switch" for="time-format-toggle-artists">
-                    <input type="checkbox" id="time-format-toggle-artists" onchange="toggleTimeFormat('time-format-toggle-artists')">
-                    <div class="slider"></div>
-                </label>
-                <span class="time-format-label">d/h/m</span>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div class="time-format-wrapper">
+                    <span class="time-format-label">Show Blacklisted</span>
+                    <label class="time-format-switch" for="blacklist-toggle-artists">
+                        <input type="checkbox" id="blacklist-toggle-artists" onchange="toggleBlacklistedStats()">
+                        <div class="slider"></div>
+                    </label>
+                </div>
+                <div class="time-format-wrapper">
+                    <span class="time-format-label">m:s</span>
+                    <label class="time-format-switch" for="time-format-toggle-artists">
+                        <input type="checkbox" id="time-format-toggle-artists" onchange="toggleTimeFormat('time-format-toggle-artists')">
+                        <div class="slider"></div>
+                    </label>
+                    <span class="time-format-label">d/h/m</span>
+                </div>
             </div>
         </div>
     """
@@ -1582,6 +1637,14 @@ def database_values():
                 <div class="item-subtitle">Artist</div>
             </div>
             <div class="item-stats">
+                <div class="stat-box blacklisted-stats" style="display: none;">
+                    <div class="stat-value">{artist.get('blacklisted_listens', 0)}</div>
+                    <div class="stat-label">Blacklisted Listens</div>
+                </div>
+                <div class="stat-box blacklisted-stats" style="display: none;">
+                    <div class="stat-value time-value" data-ms="{artist.get('blacklisted_time_ms', 0)}">{artist.get('blacklisted_time_formatted', '0:00')}</div>
+                    <div class="stat-label">Blacklisted Time</div>
+                </div>
                 <div class="stat-box">
                     <div class="stat-value">{artist['listens']}</div>
                     <div class="stat-label">Listens</div>
@@ -1608,13 +1671,22 @@ def database_values():
                     <option value="time">Total Listen Time</option>
                 </select>
             </div>
-            <div class="time-format-wrapper">
-                <span class="time-format-label">m:s</span>
-                <label class="time-format-switch" for="time-format-toggle-albums">
-                    <input type="checkbox" id="time-format-toggle-albums" onchange="toggleTimeFormat('time-format-toggle-albums')">
-                    <div class="slider"></div>
-                </label>
-                <span class="time-format-label">d/h/m</span>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div class="time-format-wrapper">
+                    <span class="time-format-label">Show Blacklisted</span>
+                    <label class="time-format-switch" for="blacklist-toggle-albums">
+                        <input type="checkbox" id="blacklist-toggle-albums" onchange="toggleBlacklistedStats()">
+                        <div class="slider"></div>
+                    </label>
+                </div>
+                <div class="time-format-wrapper">
+                    <span class="time-format-label">m:s</span>
+                    <label class="time-format-switch" for="time-format-toggle-albums">
+                        <input type="checkbox" id="time-format-toggle-albums" onchange="toggleTimeFormat('time-format-toggle-albums')">
+                        <div class="slider"></div>
+                    </label>
+                    <span class="time-format-label">d/h/m</span>
+                </div>
             </div>
         </div>
     """
@@ -1632,6 +1704,14 @@ def database_values():
                 <div class="item-subtitle">Album • <span class="time-value" data-ms="{album['length_ms']}">{album['length_formatted']}</span></div>
             </div>
             <div class="item-stats">
+                <div class="stat-box blacklisted-stats" style="display: none;">
+                    <div class="stat-value">{album.get('blacklisted_listens', 0)}</div>
+                    <div class="stat-label">Blacklisted Listens</div>
+                </div>
+                <div class="stat-box blacklisted-stats" style="display: none;">
+                    <div class="stat-value time-value" data-ms="{album.get('blacklisted_time_ms', 0)}">{album.get('blacklisted_time_formatted', '0:00')}</div>
+                    <div class="stat-label">Blacklisted Time</div>
+                </div>
                 <div class="stat-box">
                     <div class="stat-value">{album['listens']}</div>
                     <div class="stat-label">Listens</div>
@@ -1680,4 +1760,4 @@ def refresh_token():
     return redirect('/menu')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', debug=True)
+    app.run(host='0.0.0.0', debug=True, use_reloader=False)
