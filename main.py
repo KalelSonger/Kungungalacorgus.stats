@@ -188,6 +188,7 @@ def process_and_store_track(track, played_at, access_token):
             'played_at': played_at,
             'image_url': track['album']['images'][0]['url'] if track['album'].get('images') else None
         }
+        print(f"  📷 Song image URL: {song_data.get('image_url', 'None')[:50] if song_data.get('image_url') else 'None'}")
         
         # Insert/update song
         if not insert_or_update_song(song_data):
@@ -208,6 +209,7 @@ def process_and_store_track(track, played_at, access_token):
             total_tracks = album_full.get('total_tracks', 0)
             album_length_ms = sum(t['duration_ms'] for t in album_full.get('tracks', {}).get('items', []))
             album_image_url = album_full['images'][0]['url'] if album_full.get('images') else None
+            print(f"  📷 Album image URL: {album_image_url[:50] if album_image_url else 'None'}")
             
             if not insert_or_update_album(
                 album_id,
@@ -236,6 +238,7 @@ def process_and_store_track(track, played_at, access_token):
             if artist_response.status_code == 200:
                 artist_full = artist_response.json()
                 artist_image_url = artist_full['images'][0]['url'] if artist_full.get('images') else None
+            print(f"  📷 Artist image URL: {artist_image_url[:50] if artist_image_url else 'None'}")
             
             # Insert/update artist
             if not insert_or_update_artist(artist_id, artist_name, track['duration_ms'], artist_image_url):
@@ -460,6 +463,8 @@ def database_values():
         user_profile = profile_response.json()
         user_id = user_profile.get('id', 'N/A')
         user_username = user_profile.get('display_name', 'N/A')
+        user_image = user_profile.get('images', [{}])[0].get('url') if user_profile.get('images') else None
+        user_image = user_profile.get('images', [{}])[0].get('url') if user_profile.get('images') else None
     except requests.exceptions.RequestException as e:
         extra_note = ""
         if profile_response is not None and profile_response.status_code == 403:
@@ -517,9 +522,12 @@ def database_values():
             'title': song['title'],
             'artists': song['artists'],
             'album_title': song['album_title'],
+            'length_ms': song['length_ms'],
             'length_formatted': f"{song['length_ms'] // 60000}:{(song['length_ms'] % 60000) // 1000:02d}",
             'listen_count': song['listen_count'],
-            'listen_time_formatted': f"{song['listen_time_ms'] // 60000}:{(song['listen_time_ms'] % 60000) // 1000:02d}"
+            'listen_time_ms': song['listen_time_ms'],
+            'listen_time_formatted': f"{song['listen_time_ms'] // 60000}:{(song['listen_time_ms'] % 60000) // 1000:02d}",
+            'image_url': song.get('image_url')
         })
     
     # Format artist data for display
@@ -529,7 +537,9 @@ def database_values():
             'id': artist['id'],
             'name': artist['name'],
             'listens': artist['listens'],
-            'listen_time_formatted': f"{artist['listen_time_ms'] // 60000}:{(artist['listen_time_ms'] % 60000) // 1000:02d}"
+            'listen_time_ms': artist['listen_time_ms'],
+            'listen_time_formatted': f"{artist['listen_time_ms'] // 60000}:{(artist['listen_time_ms'] % 60000) // 1000:02d}",
+            'image_url': artist.get('image_url')
         })
     
     # Format album data for display
@@ -538,9 +548,12 @@ def database_values():
         album_list.append({
             'id': album['id'],
             'title': album['title'],
+            'listen_time_ms': album['listen_time_ms'],
             'listen_time_formatted': f"{album['listen_time_ms'] // 60000}:{(album['listen_time_ms'] % 60000) // 1000:02d}",
             'listens': album['listens'],
-            'length_formatted': f"{album['length_ms'] // 60000}:{(album['length_ms'] % 60000) // 1000:02d}"
+            'length_ms': album['length_ms'],
+            'length_formatted': f"{album['length_ms'] // 60000}:{(album['length_ms'] % 60000) // 1000:02d}",
+            'image_url': album.get('image_url')
         })
     
     # Get blacklist from persistent storage
@@ -720,6 +733,28 @@ def database_values():
             margin-left: 10px;
             font-weight: bold;
         }}
+        .time-format-wrapper {{
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            z-index: 1000;
+            font-size: 14px;
+        }}
+        .time-format-switch {{
+            display: inline-block;
+            height: 34px;
+            position: relative;
+            width: 60px;
+            margin: 0 10px;
+        }}
+        .time-format-switch input {{
+            display: none;
+        }}
+        .time-format-label {{
+            font-weight: bold;
+        }}
         .blacklist-container {{
             transition: background-color 0.3s;
         }}
@@ -800,6 +835,31 @@ def database_values():
         body.light-mode .stat-label {{
             color: #666;
         }}
+        .user-profile {{
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }}
+        .user-profile img {{
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid #1DB954;
+        }}
+        .user-profile span {{
+            font-size: 18px;
+            font-weight: bold;
+            color: #1DB954;
+        }}
+        h1.main-title {{
+            text-align: center;
+            font-weight: bold;
+            margin-top: 80px;
+            font-size: 36px;
+        }}
     </style>
     <script>
         // Auto-refresh page every 2 minutes
@@ -812,6 +872,7 @@ def database_values():
             document.body.classList.toggle('light-mode');
             var isLightMode = document.body.classList.contains('light-mode');
             localStorage.setItem('theme', isLightMode ? 'light' : 'dark');
+            document.querySelector('.theme-label').textContent = isLightMode ? '☀️' : '🌙';
         }}
         
         // Load saved theme preference
@@ -820,6 +881,56 @@ def database_values():
             if (savedTheme === 'light') {{
                 document.body.classList.add('light-mode');
                 document.getElementById('theme-toggle').checked = true;
+                document.querySelector('.theme-label').textContent = '☀️';
+            }} else {{
+                document.querySelector('.theme-label').textContent = '🌙';
+            }}
+        }}
+        
+        // Time format toggle function
+        function toggleTimeFormat() {{
+            var isExtended = document.getElementById('time-format-toggle').checked;
+            localStorage.setItem('timeFormat', isExtended ? 'extended' : 'compact');
+            updateTimeDisplays(isExtended);
+        }}
+        
+        // Load saved time format preference
+        function loadTimeFormat() {{
+            var savedFormat = localStorage.getItem('timeFormat');
+            if (savedFormat === 'extended') {{
+                document.getElementById('time-format-toggle').checked = true;
+                updateTimeDisplays(true);
+            }} else {{
+                updateTimeDisplays(false);
+            }}
+        }}
+        
+        // Update all time displays based on format
+        function updateTimeDisplays(isExtended) {{
+            var timeElements = document.querySelectorAll('.time-value');
+            timeElements.forEach(function(element) {{
+                var ms = parseInt(element.getAttribute('data-ms'));
+                element.textContent = formatTime(ms, isExtended);
+            }});
+        }}
+        
+        // Format time based on selected format
+        function formatTime(ms, isExtended) {{
+            if (isExtended) {{
+                var days = Math.floor(ms / (24 * 60 * 60 * 1000));
+                var hours = Math.floor((ms % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+                var minutes = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000));
+                
+                var parts = [];
+                if (days > 0) parts.push(days + 'd');
+                if (hours > 0) parts.push(hours + 'h');
+                if (minutes > 0 || parts.length === 0) parts.push(minutes + 'm');
+                
+                return parts.join(' ');
+            }} else {{
+                var minutes = Math.floor(ms / 60000);
+                var seconds = Math.floor((ms % 60000) / 1000);
+                return minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
             }}
         }}
         
@@ -889,6 +1000,7 @@ def database_values():
         // Open first tab by default on page load
         window.onload = function() {{
             loadTheme();
+            loadTimeFormat();
             document.getElementsByClassName("tablinks")[0].click();
         }}
     </script>
@@ -899,21 +1011,26 @@ def database_values():
             <input type="checkbox" id="theme-toggle" onchange="toggleTheme()">
             <div class="slider"></div>
         </label>
-        <span class="theme-label">☀️</span>
+        <span class="theme-label">🌙</span>
     </div>
     
-    <h1>Spotify Stats Dashboard</h1>
-    
-    <h2>User Information</h2>
-    <p><strong>Username:</strong> {user_username}</p>
-    
-    <div style="margin: 20px 0;">
-        <label for="syncLimit" style="font-weight: bold;">Number of songs to sync (1-50):</label>
-        <input type="number" id="syncLimit" min="1" max="50" value="10" style="width: 80px; padding: 8px; margin: 0 10px; font-size: 16px;">
-        <button onclick="syncSongs()" style="padding: 10px 20px; background-color: #1DB954; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 16px;">
-            🔄 Sync Recent Songs
-        </button>
+    <!-- Time Format Toggle Switch -->
+    <div class="time-format-wrapper">
+        <span class="time-format-label">m:s</span>
+        <label class="time-format-switch" for="time-format-toggle">
+            <input type="checkbox" id="time-format-toggle" onchange="toggleTimeFormat()">
+            <div class="slider"></div>
+        </label>
+        <span class="time-format-label">d/h/m</span>
     </div>
+    
+    <!-- User Profile -->
+    <div class="user-profile">
+        {f'<img src="{user_image}" alt="{user_username}">' if user_image else '<div style="width: 50px; height: 50px; border-radius: 50%; background-color: #1DB954; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; color: white;">{user_username[0] if user_username else "?"}</div>'}
+        <span>{user_username}</span>
+    </div>
+    
+    <h1 class="main-title">Welcome to Kungungalacorgus.stats!</h1>
     
     <div class="blacklist-container" style="margin: 20px 0; padding: 15px; border: 2px solid #1DB954; border-radius: 8px; background-color: #1e1e1e;">
         <h3 style="margin-top: 0;">🚫 Blacklist</h3>
@@ -960,15 +1077,24 @@ def database_values():
     
     <!-- Statistics Tab -->
     <div id="Statistics" class="tabcontent">
-        <h2>Song Statistics</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0;">Song Statistics</h2>
+            <div>
+                <label for="syncLimit" style="font-weight: bold; margin-right: 10px;">Sync songs (1-50):</label>
+                <input type="number" id="syncLimit" min="1" max="50" value="10" style="width: 70px; padding: 8px; font-size: 14px;">
+                <button onclick="syncSongs()" style="padding: 8px 16px; background-color: #1DB954; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px; margin-left: 10px;">
+                    🔄 Sync
+                </button>
+            </div>
+        </div>
         <table border="1" style="border-collapse: collapse; width: 100%;">
             <tr>
                 <th style="padding: 10px;">Title</th>
                 <th style="padding: 10px;">Artist(s)</th>
                 <th style="padding: 10px;">Album</th>
-                <th style="padding: 10px;">Length</th>
-                <th style="padding: 10px;">Listen Count</th>
-                <th style="padding: 10px;">Total Listen Time</th>
+                <th style="padding: 10px; text-align: center;">Length</th>
+                <th style="padding: 10px; text-align: center;">Listen Count</th>
+                <th style="padding: 10px; text-align: center;">Total Listen Time</th>
             </tr>
     """
     
@@ -978,9 +1104,9 @@ def database_values():
                 <td style="padding: 10px;">{song['title']}</td>
                 <td style="padding: 10px;">{song['artists']}</td>
                 <td style="padding: 10px;">{song['album_title']}</td>
-                <td style="padding: 10px;">{song['length_formatted']}</td>
-                <td style="padding: 10px;">{song['listen_count']}</td>
-                <td style="padding: 10px;">{song['listen_time_formatted']}</td>
+                <td style="padding: 10px; text-align: center;" class="time-value" data-ms="{song['length_ms']}">{song['length_formatted']}</td>
+                <td style="padding: 10px; text-align: center;">{song['listen_count']}</td>
+                <td style="padding: 10px; text-align: center;" class="time-value" data-ms="{song['listen_time_ms']}">{song['listen_time_formatted']}</td>
             </tr>
         """
     
@@ -991,8 +1117,8 @@ def database_values():
         <table border="1" style="border-collapse: collapse; width: 100%;">
             <tr>
                 <th style="padding: 10px;">Artist Name</th>
-                <th style="padding: 10px;">Total Listens</th>
-                <th style="padding: 10px;">Total Listen Time</th>
+                <th style="padding: 10px; text-align: center;">Total Listens</th>
+                <th style="padding: 10px; text-align: center;">Total Listen Time</th>
             </tr>
     """
     
@@ -1000,8 +1126,8 @@ def database_values():
         html += f"""
             <tr>
                 <td style="padding: 10px;">{artist['name']}</td>
-                <td style="padding: 10px;">{artist['listens']}</td>
-                <td style="padding: 10px;">{artist['listen_time_formatted']}</td>
+                <td style="padding: 10px; text-align: center;">{artist['listens']}</td>
+                <td style="padding: 10px; text-align: center;" class="time-value" data-ms="{artist['listen_time_ms']}">{artist['listen_time_formatted']}</td>
             </tr>
         """
     
@@ -1012,9 +1138,9 @@ def database_values():
         <table border="1" style="border-collapse: collapse; width: 100%;">
             <tr>
                 <th style="padding: 10px;">Album Title</th>
-                <th style="padding: 10px;">Total Listen Time</th>
-                <th style="padding: 10px;">Album Listens</th>
-                <th style="padding: 10px;">Album Length</th>
+                <th style="padding: 10px; text-align: center;">Total Listen Time</th>
+                <th style="padding: 10px; text-align: center;">Album Listens</th>
+                <th style="padding: 10px; text-align: center;">Album Length</th>
             </tr>
     """
     
@@ -1022,9 +1148,9 @@ def database_values():
         html += f"""
             <tr>
                 <td style="padding: 10px;">{album['title']}</td>
-                <td style="padding: 10px;">{album['listen_time_formatted']}</td>
-                <td style="padding: 10px;">{album['listens']}</td>
-                <td style="padding: 10px;">{album['length_formatted']}</td>
+                <td style="padding: 10px; text-align: center;" class="time-value" data-ms="{album['listen_time_ms']}">{album['listen_time_formatted']}</td>
+                <td style="padding: 10px; text-align: center;">{album['listens']}</td>
+                <td style="padding: 10px; text-align: center;" class="time-value" data-ms="{album['length_ms']}">{album['length_formatted']}</td>
             </tr>
         """
     
@@ -1071,6 +1197,10 @@ def database_values():
         # Use actual album art or fallback to SVG placeholder
         img_url = song.get('image_url') or "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' fill='%231DB954'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='40' fill='white'%3E♪%3C/text%3E%3C/svg%3E"
         
+        # Debug: print first 3 songs
+        if idx <= 3:
+            print(f"DEBUG Top Song {idx}: {song['title']}, image_url: {song.get('image_url', 'NONE')[:50] if song.get('image_url') else 'NONE'}")
+        
         html += f"""
         <div class="top-item-card">
             <div class="rank-number">{idx}</div>
@@ -1085,7 +1215,7 @@ def database_values():
                     <div class="stat-label">Plays</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-value">{song['listen_time_formatted']}</div>
+                    <div class="stat-value time-value" data-ms="{song['listen_time_ms']}">{song['listen_time_formatted']}</div>
                     <div class="stat-label">Time</div>
                 </div>
             </div>
@@ -1125,7 +1255,7 @@ def database_values():
                     <div class="stat-label">Listens</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-value">{artist['listen_time_formatted']}</div>
+                    <div class="stat-value time-value" data-ms="{artist['listen_time_ms']}">{artist['listen_time_formatted']}</div>
                     <div class="stat-label">Time</div>
                 </div>
             </div>
@@ -1157,7 +1287,7 @@ def database_values():
             <img src="{img_url}" alt="{album['title']}" class="item-image">
             <div class="item-info">
                 <div class="item-title">{album['title']}</div>
-                <div class="item-subtitle">Album • {album['length_formatted']}</div>
+                <div class="item-subtitle">Album • <span class="time-value" data-ms="{album['length_ms']}">{album['length_formatted']}</span></div>
             </div>
             <div class="item-stats">
                 <div class="stat-box">
@@ -1165,7 +1295,7 @@ def database_values():
                     <div class="stat-label">Listens</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-value">{album['listen_time_formatted']}</div>
+                    <div class="stat-value time-value" data-ms="{album['listen_time_ms']}">{album['listen_time_formatted']}</div>
                     <div class="stat-label">Time</div>
                 </div>
             </div>
