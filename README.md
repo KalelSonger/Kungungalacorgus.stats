@@ -66,9 +66,10 @@ These can skew your "real" listening statistics. The blacklist feature lets you 
 ## Project Structure
 
 ```
-├── main.py              # Flask app with Spotify OAuth
+├── main.py              # Flask app with Spotify OAuth and web interface
 ├── database.py          # MySQL database layer
-├── clear_database.py    # Database reset utility
+├── menu.py              # Console menu interface
+├── check_background.py  # Background process management
 ├── requirements.txt     # Python dependencies
 ├── SETUP.md            # Detailed setup instructions
 ├── Stats.sql           # Database schema

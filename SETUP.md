@@ -147,7 +147,7 @@ This script:
 .\.venv\Scripts\Activate.ps1
 
 # Run the app
-python main.py
+.\.venv\Scripts\python.exe main.py
 ```
 
 #### MacOS/Linux
@@ -231,13 +231,15 @@ The app will automatically:
 
 To clear all statistics and start fresh:
 
-```bash
-# Windows
-.\.venv\Scripts\python.exe clear_database.py
+### Option 1: Using the Web Interface
+1. Navigate to the website
+2. Click the "Clear Database" button at the bottom of any page
+3. Confirm the action
 
-# MacOS/Linux
-.venv/bin/python clear_database.py
-```
+### Option 2: Using the Console Menu
+1. Run `python menu.py`
+2. Select "Clear Database" option
+3. Type "yes" to confirm
 
 This will delete all songs, artists, albums, and relationships from the database.
 

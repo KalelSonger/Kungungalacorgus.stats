@@ -196,12 +196,34 @@ def insert_or_update_song(song_data):
             played_at_str = None
         
         # Check if song exists
-        cursor.execute("SELECT S_Listens, S_Listen_Time, S_Blacklisted_Listens, S_Blacklisted_Time FROM Songs WHERE S_ID = %s", (song_data['id'],))
+        cursor.execute("SELECT S_Listens, S_Listen_Time, S_Blacklisted_Listens, S_Blacklisted_Time, last_played FROM Songs WHERE S_ID = %s", (song_data['id'],))
         result = cursor.fetchone()
         
         is_blacklisted = song_data.get('is_blacklisted', False)
+        is_initial_load = song_data.get('is_initial_load', False)
         
         if result:
+            # If this is an initial load, don't increment counts - song already exists
+            if is_initial_load:
+                cursor.close()
+                connection.close()
+                return True
+            
+            # Check if this specific listen was already processed by comparing timestamps
+            last_played_db = result[4]
+            if played_at_str and last_played_db == played_at_str:
+                # This exact listen was already processed, don't increment counts
+                # Just update the image URL if needed
+                cursor.execute("""
+                    UPDATE Songs 
+                    SET image_url = %s
+                    WHERE S_ID = %s
+                """, (song_data.get('image_url'), song_data['id']))
+                connection.commit()
+                cursor.close()
+                connection.close()
+                return True
+            
             new_listen_count = result[0] + (0 if is_blacklisted else 1)
             new_listen_time = result[1] + (0 if is_blacklisted else song_data['length_ms'])
             new_blacklisted_listens = result[2] + (1 if is_blacklisted else 0)
@@ -215,10 +237,17 @@ def insert_or_update_song(song_data):
             """, (new_listen_count, new_listen_time, new_blacklisted_listens, new_blacklisted_time,
                   played_at_str, song_data.get('image_url'), song_data['id']))
         else:
-            initial_listens = 0 if is_blacklisted else 1
-            initial_time = 0 if is_blacklisted else song_data['length_ms']
-            initial_blacklisted_listens = 1 if is_blacklisted else 0
-            initial_blacklisted_time = song_data['length_ms'] if is_blacklisted else 0
+            # If this is initial load, start with 0 counts; otherwise start with 1
+            if is_initial_load:
+                initial_listens = 0
+                initial_time = 0
+                initial_blacklisted_listens = 0
+                initial_blacklisted_time = 0
+            else:
+                initial_listens = 0 if is_blacklisted else 1
+                initial_time = 0 if is_blacklisted else song_data['length_ms']
+                initial_blacklisted_listens = 1 if is_blacklisted else 0
+                initial_blacklisted_time = song_data['length_ms'] if is_blacklisted else 0
             
             cursor.execute("""
                 INSERT INTO Songs (S_ID, S_Title, S_Length, S_Listens, S_Listen_Time, S_Blacklisted_Listens, 
@@ -878,4 +907,36 @@ def check_if_play_exists(song_id, played_at_timestamp):
     finally:
         if connection.is_connected():
             connection.close()
+
+# Clear all data from the database
+def clear_all_data():
+    connection = get_db_connection()
+    if not connection:
+        print("Error: Could not connect to database")
+        return False
+    
+    try:
+        cursor = connection.cursor()
+        
+        # Disable foreign key checks
+        cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+        
+        # Clear all tables
+        cursor.execute("TRUNCATE TABLE Creates")
+        cursor.execute("TRUNCATE TABLE Album_Song")
+        cursor.execute("TRUNCATE TABLE Playlist_Song")
+        cursor.execute("TRUNCATE TABLE Songs")
+        cursor.execute("TRUNCATE TABLE Artists")
+        cursor.execute("TRUNCATE TABLE Albums")
+        
+        # Re-enable foreign key checks
+        cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        return True
+    except Error as e:
+        print(f"Error clearing database: {e}")
+        return False
 

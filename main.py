@@ -1,4 +1,5 @@
 ﻿import os
+import sys
 import requests
 import urllib.parse
 import json
@@ -7,8 +8,20 @@ import time
 import glob
 import platform
 import shutil
+import psutil
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
+
+# Set UTF-8 encoding for Windows console to support special characters
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        # Python < 3.7
+        import codecs
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 
 from flask import Flask, redirect, request, session, jsonify, url_for
 from datetime import datetime, timedelta
@@ -18,7 +31,7 @@ from database import (
     get_all_songs, get_all_artists, get_all_albums,
     get_or_create_user, get_user_playlists, insert_or_update_playlist,
     link_playlist_song, get_last_sync_timestamp, save_last_sync_timestamp,
-    get_blacklist, add_to_blacklist, remove_from_blacklist
+    get_blacklist, add_to_blacklist, remove_from_blacklist, get_db_connection
 )
 
 load_dotenv()
@@ -111,21 +124,18 @@ def start_ngrok():
         print(f"Warning: Could not start ngrok: {e}")
         print(f"   Make sure ngrok is installed. See SETUP.md for instructions.")
 
-start_ngrok()
 #Background job to sync recent plays
 def sync_recent_plays_background():
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] Background sync job started...")
+    # Silent background sync - no print statements to avoid interrupting menu
     try:
         token_data = load_token_from_file()
         if not token_data:
-            print("!!! No token file found - please log in through the web interface first")
             return
         
         # Check if token expired and refresh if needed
         if datetime.now().timestamp() > token_data['expires_at']:
             access_token = refresh_token_in_background()
             if not access_token:
-                print("Failed to refresh token in background")
                 return
         else:
             access_token = token_data['access_token']
@@ -157,26 +167,194 @@ def sync_recent_plays_background():
             
             # Process new plays
             if new_plays:
-                for item in new_plays:
+                total_tracks = len(new_plays)
+                for idx, item in enumerate(new_plays):
                     track = item['track']
                     played_at = datetime.fromisoformat(item['played_at'].replace('Z', '+00:00'))
                     
                     context = item.get('context')
                     
-                    process_and_store_track(track, played_at, access_token, context)
+                    # Countdown from total to 1
+                    process_and_store_track(track, played_at, access_token, context, 
+                                          progress_current=total_tracks - idx, 
+                                          progress_total=total_tracks)
                 
                 
                 save_last_sync_timestamp(latest_timestamp)
-                print(f"✓ Background sync: Processed {len(new_plays)} new track(s)")
-            else:
-                print("✓ Background sync: No new plays to process")
+                # Silent - no print output
     except Exception as e:
-        print(f"Background sync error: {e}")
+        # Silent - no print output
+        pass
 
 scheduler.add_job(func=sync_recent_plays_background, trigger="interval", minutes=2, id='sync_job')
 
+def get_database_counts():
+    """Get the count of entries in the database"""
+    connection = get_db_connection()
+    if not connection:
+        return None
+    
+    try:
+        cursor = connection.cursor(dictionary=True)
+        
+        # Count songs
+        cursor.execute("SELECT COUNT(*) as count FROM Songs WHERE flag = 1")
+        songs_count = cursor.fetchone()['count']
+        
+        # Count artists
+        cursor.execute("SELECT COUNT(*) as count FROM Artists WHERE flag = 1")
+        artists_count = cursor.fetchone()['count']
+        
+        # Count albums
+        cursor.execute("SELECT COUNT(*) as count FROM Albums WHERE flag = 1")
+        albums_count = cursor.fetchone()['count']
+        
+        # Count total plays (sum of listens)
+        cursor.execute("SELECT SUM(S_Listens) as total FROM Songs WHERE flag = 1")
+        total_plays = cursor.fetchone()['total'] or 0
+        
+        cursor.close()
+        connection.close()
+        
+        return {
+            'songs': songs_count,
+            'artists': artists_count,
+            'albums': albums_count,
+            'total_plays': total_plays
+        }
+    except Exception as e:
+        print(f"Error getting database counts: {e}")
+        return None
+
+def populate_database_bulk(access_token=None):
+    """Populate database with all available recent history from Spotify (up to 50 tracks)"""
+    
+    # Get or load access token
+    if not access_token:
+        token_data = load_token_from_file()
+        if not token_data:
+            return {'success': False, 'error': 'No authentication token found', 'already_synced': False}
+        
+        # Check if token expired and refresh if needed
+        if datetime.now().timestamp() > token_data['expires_at']:
+            access_token = refresh_token_in_background()
+            if not access_token:
+                return {'success': False, 'error': 'Failed to refresh token', 'already_synced': False}
+        else:
+            access_token = token_data['access_token']
+    
+    headers = {'Authorization': f"Bearer {access_token}"}
+    
+    print(f"\n{'='*60}")
+    print(f"Loading Recent History from Spotify")
+    print(f"{'='*60}\n")
+    
+    try:
+        # Fetch all available recent tracks (limit 50)
+        print(f"Fetching your recent listening history...")
+        response = requests.get(
+            API_BASE_URL + '/me/player/recently-played?limit=50',
+            headers=headers
+        )
+        
+        if response.status_code == 429:
+            retry_after = int(response.headers.get('Retry-After', 60))
+            print(f"⚠ Rate limit hit. Please wait {retry_after} seconds and try again.")
+            return {
+                'success': False,
+                'error': f'Rate limited. Wait {retry_after} seconds.',
+                'already_synced': False
+            }
+        
+        if response.status_code != 200:
+            error_msg = f"Failed to fetch tracks: {response.status_code}"
+            print(f"❌ {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg,
+                'already_synced': False
+            }
+        
+        recent_data = response.json()
+        items = recent_data.get('items', [])
+        
+        if not items:
+            print("\n⚠ No tracks found in your recent listening history.")
+            return {
+                'success': True,
+                'processed': 0,
+                'already_synced': True
+            }
+        
+        print(f"Found {len(items)} tracks in recent history.\n")
+        
+        total_processed = 0
+        total_skipped = 0
+        
+        # Process each track - only ADD new songs, don't increment counts
+        for idx, item in enumerate(items, 1):
+            track = item['track']
+            played_at_dt = datetime.fromisoformat(item['played_at'].replace('Z', '+00:00'))
+            context = item.get('context')
+            
+            # Check if song exists before processing
+            if song_exists_in_database(track['id']):
+                total_skipped += 1
+                print(f"[{idx}/{len(items)}] Skipping: {track['name']}")
+            else:
+                print(f"[{idx}/{len(items)}] Adding: {track['name']}")
+                # Pass a flag to indicate this is initial population, not a new play
+                process_and_store_track(track, played_at_dt, access_token, context, is_initial_load=True)
+                total_processed += 1
+        
+        print(f"\n{'='*60}")
+        if total_processed == 0 and total_skipped > 0:
+            print(f"✓ Recent history already synced!")
+            print(f"  All {total_skipped} tracks from your recent history")
+            print(f"  are already in the database.")
+            already_synced = True
+        else:
+            print(f"✓ Recent history loaded!")
+            print(f"  New tracks added: {total_processed}")
+            if total_skipped > 0:
+                print(f"  Already in database: {total_skipped}")
+            already_synced = False
+        print(f"{'='*60}\n")
+        
+        return {
+            'success': True,
+            'processed': total_processed,
+            'skipped': total_skipped,
+            'already_synced': already_synced
+        }
+        
+    except Exception as e:
+        error_msg = f"Error loading recent history: {e}"
+        print(f"❌ {error_msg}")
+        return {
+            'success': False,
+            'error': error_msg,
+            'already_synced': False
+        }
+
+def song_exists_in_database(song_id):
+    """Check if a song already exists in the database"""
+    connection = get_db_connection()
+    if not connection:
+        return False
+    
+    try:
+        cursor = connection.cursor()
+        cursor.execute("SELECT COUNT(*) FROM Songs WHERE S_ID = %s AND flag = 1", (song_id,))
+        count = cursor.fetchone()[0]
+        cursor.close()
+        connection.close()
+        return count > 0
+    except Exception as e:
+        return False
+
 #Process a track and store it in the database with all related data
-def process_and_store_track(track, played_at, access_token, context=None):
+def process_and_store_track(track, played_at, access_token, context=None, progress_current=None, progress_total=None, is_initial_load=False):
     
     try:
         is_blacklisted = False
@@ -189,7 +367,11 @@ def process_and_store_track(track, played_at, access_token, context=None):
                 blacklist = get_blacklist()
                 is_blacklisted = any(p['id'] == playlist_id for p in blacklist)
         
-        print(f"\n[Processing] {track['name']} by {', '.join([a['name'] for a in track['artists']])} - Blacklisted: {is_blacklisted}")
+        # Show progress if provided
+        if progress_current is not None and progress_total is not None:
+            print(f"\nAdding song: {track['name']} [{progress_current}/{progress_total}]")
+        else:
+            print(f"\n[Processing] {track['name']} by {', '.join([a['name'] for a in track['artists']])} - Blacklisted: {is_blacklisted}")
         
         # Prepare song data
         song_data = {
@@ -198,7 +380,8 @@ def process_and_store_track(track, played_at, access_token, context=None):
             'length_ms': track['duration_ms'],
             'played_at': played_at,
             'image_url': track['album']['images'][0]['url'] if track['album'].get('images') else None,
-            'is_blacklisted': is_blacklisted
+            'is_blacklisted': is_blacklisted,
+            'is_initial_load': is_initial_load  # Pass flag to database function
         }
         
         # Insert/update song
@@ -399,69 +582,102 @@ def menu():
         return jsonify({'error': error_msg, 'description': error_desc})
 
     html = """
-    <h1>Spotify Stats Menu</h1>
-    <ul>
-        <li><a href='/database_values'>Database Values</a></li>
-    </ul>
-    <a href='/'>Back to home</a>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Menu - Kungungalacorgus.stats</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                background-color: #121212;
+                color: #FFFFFF;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                flex-direction: column;
+            }
+            h1 {
+                font-size: 48px;
+                font-weight: bold;
+                margin-bottom: 30px;
+                text-align: center;
+                color: #1DB954;
+            }
+            .button-container {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+                margin-bottom: 30px;
+            }
+            .menu-button {
+                padding: 15px 40px;
+                background-color: #1DB954;
+                color: white;
+                border: none;
+                border-radius: 30px;
+                font-size: 18px;
+                font-weight: bold;
+                cursor: pointer;
+                text-decoration: none;
+                display: inline-block;
+                transition: background-color 0.3s, transform 0.1s;
+                text-align: center;
+                min-width: 250px;
+            }
+            .menu-button:hover {
+                background-color: #1ed760;
+                transform: scale(1.05);
+            }
+            .menu-button:active {
+                transform: scale(0.98);
+            }
+            .back-link {
+                color: #1DB954;
+                text-decoration: none;
+                font-size: 16px;
+                margin-top: 20px;
+                transition: opacity 0.3s;
+            }
+            .back-link:hover {
+                opacity: 0.7;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Spotify Stats Menu</h1>
+        <div class="button-container">
+            <a href='/database_values' class="menu-button">📊 View Dashboard</a>
+        </div>
+        <a href='/' class="back-link">← Back to Home</a>
+    </body>
+    </html>
     """
     
     return html
 
 @app.route('/sync_recent')
 def sync_recent():
-    """Sync recent songs from Spotify with variable limit"""
+    """Load all recent history from Spotify (same as populate database)"""
     if 'access_token' not in session:
         return redirect('/login')
     
     if datetime.now().timestamp() > session['expires_at']:
         return redirect('/refresh_token')
     
-    # Get limit from query parameter, default to 10
-    try:
-        limit = int(request.args.get('limit', 10))
-        # spotify api limit = 50 dont exceed
-        limit = min(max(1, limit), 50)
-    except ValueError:
-        limit = 10
+    # Use the populate function to load recent history
+    result = populate_database_bulk(access_token=session['access_token'])
     
-    headers = {
-        'Authorization': f"Bearer {session['access_token']}"
+    # Store result in session to show on next page
+    session['sync_result'] = {
+        'success': result.get('success', False),
+        'processed': result.get('processed', 0),
+        'skipped': result.get('skipped', 0),
+        'already_synced': result.get('already_synced', False),
+        'error': result.get('error')
     }
-    
-    try:
-        last_sync = get_last_sync_timestamp()
-        recent_response = requests.get(API_BASE_URL + f'/me/player/recently-played?limit={limit}', headers=headers)
-        
-        if recent_response.status_code == 200:
-            recent_data = recent_response.json()
-            items = recent_data.get('items', [])
-            
-            # Process items in reverse order (oldest first)
-            processed_count = 0
-            latest_timestamp = last_sync
-            
-            for item in reversed(items):
-                track = item['track']
-                played_at = item['played_at']
-                played_at_dt = datetime.fromisoformat(item['played_at'].replace('Z', '+00:00'))
-                
-                context = item.get('context')
-                
-                process_and_store_track(track, played_at_dt, session['access_token'], context)
-                processed_count += 1
-                
-                if latest_timestamp is None or played_at > latest_timestamp:
-                    latest_timestamp = played_at
-            
-            # Save the latest timestamp if we processed any tracks
-            if processed_count > 0 and latest_timestamp is not None:
-                save_last_sync_timestamp(latest_timestamp)
-                print(f"✓ Manual sync: Processed {processed_count} track(s)")
-            else:
-                print("✓ Manual sync: No plays to process")
-    except Exception as e:
-        print(f"Error syncing recent plays: {e}")
     
     return redirect('/database_values')
 
@@ -533,56 +749,175 @@ def clear_database_route():
         return redirect('/login')
     
     try:
-        # Import and run the clear_database module
-        import clear_database
-        import importlib
-        importlib.reload(clear_database)  # Reload to get fresh execution
+        # Clear database directly without importing the script
+        import mysql.connector
         
-        return """
-        <html>
-        <head>
-            <title>Database Cleared</title>
-            <style>
-                body {{
-                    background-color: #121212;
-                    color: #FFFFFF;
-                    font-family: Arial, sans-serif;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    height: 100vh;
-                    flex-direction: column;
-                }}
-                h1 {{ color: #1DB954; }}
-                a {{
-                    color: #1DB954;
-                    text-decoration: none;
-                    font-weight: bold;
-                    padding: 10px 20px;
-                    border: 2px solid #1DB954;
-                    border-radius: 5px;
-                    margin-top: 20px;
-                    display: inline-block;
-                }}
-                a:hover {{
-                    background-color: #1DB954;
-                    color: white;
-                }}
-            </style>
-        </head>
-        <body>
-            <h1>✓ Database Cleared Successfully</h1>
-            <p>All songs, artists, and albums have been deleted.</p>
-            <a href='/database_values'>Return to Dashboard</a>
-        </body>
-        </html>
-        """
+        connection = mysql.connector.connect(
+            host=os.getenv('DB_HOST', 'localhost'),
+            user=os.getenv('DB_USER', 'root'),
+            password=os.getenv('DB_PASSWORD'),
+            database=os.getenv('DB_NAME', 'spotifyDatabase')
+        )
+        
+        cursor = connection.cursor()
+        
+        # Disable foreign key checks
+        cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+        
+        # Clear all tables
+        cursor.execute("DELETE FROM Album_Song")
+        cursor.execute("DELETE FROM Creates")
+        cursor.execute("DELETE FROM Songs")
+        cursor.execute("DELETE FROM Artists")
+        cursor.execute("DELETE FROM Albums")
+        
+        # Re-enable foreign key checks
+        cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        return """<!DOCTYPE html>
+<html>
+<head>
+    <title>Database Cleared - Kungungalacorgus.stats</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            color: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+        .success-icon {
+            font-size: 72px;
+            margin-bottom: 20px;
+            animation: scaleIn 0.5s ease-out;
+        }
+        h1 {
+            font-size: 42px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-align: center;
+            color: #1DB954;
+        }
+        .message {
+            font-size: 18px;
+            color: #FFFFFF;
+            margin-bottom: 30px;
+            text-align: center;
+            opacity: 0.9;
+        }
+        .return-button {
+            padding: 15px 40px;
+            background-color: #1DB954;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+        .return-button:hover {
+            background-color: #1ed760;
+            transform: scale(1.05);
+        }
+        .return-button:active {
+            transform: scale(0.98);
+        }
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="success-icon">🗑️</div>
+    <h1>Database Cleared Successfully!</h1>
+    <p class="message">All songs, artists, albums, and listening data have been removed.</p>
+    <p class="message" style="font-size: 14px; opacity: 0.7; margin-top: -10px;">Your database is now empty and ready for fresh data.</p>
+    <a href='/database_values' class="return-button">Return to Dashboard</a>
+</body>
+</html>"""
     except Exception as e:
-        return f"""
-        <h1>Error Clearing Database</h1>
-        <p>{str(e)}</p>
-        <p><a href='/database_values'>Go Back</a></p>
-        """
+        return f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Error - Kungungalacorgus.stats</title>
+    <style>
+        body {{
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            color: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }}
+        .error-icon {{
+            font-size: 72px;
+            margin-bottom: 20px;
+        }}
+        h1 {{
+            font-size: 42px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-align: center;
+            color: #FF6B6B;
+        }}
+        .message {{
+            font-size: 18px;
+            color: #FFFFFF;
+            margin-bottom: 30px;
+            text-align: center;
+            opacity: 0.9;
+            max-width: 600px;
+            padding: 0 20px;
+        }}
+        .return-button {{
+            padding: 15px 40px;
+            background-color: #1DB954;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: background-color 0.3s, transform 0.1s;
+        }}
+        .return-button:hover {{
+            background-color: #1ed760;
+            transform: scale(1.05);
+        }}
+    </style>
+</head>
+<body>
+    <div class="error-icon">⚠️</div>
+    <h1>Error Clearing Database</h1>
+    <p class="message">{str(e)}</p>
+    <a href='/database_values' class="return-button">Go Back to Dashboard</a>
+</body>
+</html>"""
 
 @app.route('/database_values')
 def database_values():
@@ -739,11 +1074,14 @@ def database_values():
             transition: background-color 0.3s, color 0.3s;
         }}
         body.light-mode {{
-            background-color: #FFFFFF;
-            color: #000000;
+            background-color: #f5f7fa;
+            color: #2c3e50;
         }}
         h1, h2, h3 {{
             color: #1DB954;
+        }}
+        body.light-mode h1, body.light-mode h2, body.light-mode h3 {{
+            color: #16a34a;
         }}
         .tab {{
             overflow: hidden;
@@ -752,7 +1090,8 @@ def database_values():
             transition: background-color 0.3s;
         }}
         body.light-mode .tab {{
-            background-color: #f1f1f1;
+            background-color: #ffffff;
+            border-bottom: 2px solid #16a34a;
         }}
         .tab button {{
             background-color: inherit;
@@ -767,16 +1106,20 @@ def database_values():
             font-weight: bold;
         }}
         body.light-mode .tab button {{
-            color: #000000;
+            color: #2c3e50;
         }}
         .tab button:hover {{
             background-color: #2a2a2a;
         }}
         body.light-mode .tab button:hover {{
-            background-color: #ddd;
+            background-color: #e8f5e9;
         }}
         .tab button.active {{
             background-color: #1DB954;
+            color: white;
+        }}
+        body.light-mode .tab button.active {{
+            background-color: #16a34a;
             color: white;
         }}
         .tabcontent {{
@@ -787,7 +1130,7 @@ def database_values():
             transition: background-color 0.3s;
         }}
         body.light-mode .tabcontent {{
-            background-color: #FFFFFF;
+            background-color: #f5f7fa;
         }}
         @keyframes fadeEffect {{
             from {{opacity: 0;}}
@@ -799,18 +1142,26 @@ def database_values():
             transition: background-color 0.3s, color 0.3s;
         }}
         body.light-mode table {{
-            background-color: #FFFFFF;
-            color: #000000;
+            background-color: #ffffff;
+            color: #2c3e50;
+            border: 1px solid #e2e8f0;
         }}
         th {{
             background-color: #1DB954;
+            color: white;
+        }}
+        body.light-mode th {{
+            background-color: #16a34a;
             color: white;
         }}
         tr:hover {{
             background-color: #2a2a2a;
         }}
         body.light-mode tr:hover {{
-            background-color: #f0f0f0;
+            background-color: #f0fdf4;
+        }}
+        body.light-mode td {{
+            border-bottom: 1px solid #e2e8f0;
         }}
         input[type="number"], input[type="text"] {{
             background-color: #2a2a2a;
@@ -819,9 +1170,13 @@ def database_values():
             transition: background-color 0.3s, color 0.3s;
         }}
         body.light-mode input[type="number"], body.light-mode input[type="text"] {{
-            background-color: #FFFFFF;
-            color: #000000;
-            border: 1px solid #ccc;
+            background-color: #ffffff;
+            color: #2c3e50;
+            border: 2px solid #cbd5e1;
+        }}
+        body.light-mode input[type="number"]:focus, body.light-mode input[type="text"]:focus {{
+            border-color: #16a34a;
+            outline: none;
         }}
         select {{
             background-color: #2a2a2a;
@@ -833,9 +1188,13 @@ def database_values():
             transition: background-color 0.3s, color 0.3s;
         }}
         body.light-mode select {{
-            background-color: #FFFFFF;
-            color: #000000;
-            border: 1px solid #ccc;
+            background-color: #ffffff;
+            color: #2c3e50;
+            border: 2px solid #cbd5e1;
+        }}
+        body.light-mode select:focus {{
+            border-color: #16a34a;
+            outline: none;
         }}
         a {{
             color: #1DB954;
@@ -852,7 +1211,8 @@ def database_values():
             transition: background-color 0.3s;
         }}
         body.light-mode .sort-control {{
-            background-color: #f5f5f5;
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
         }}
         .theme-switch-wrapper {{
             position: absolute;
@@ -914,7 +1274,8 @@ def database_values():
             transition: background-color 0.3s;
         }}
         body.light-mode .time-format-wrapper {{
-            background-color: #f5f5f5;
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
         }}
         .time-format-switch {{
             display: inline-block;
@@ -933,10 +1294,29 @@ def database_values():
             transition: background-color 0.3s;
         }}
         body.light-mode .blacklist-container {{
-            background-color: #f9f9f9 !important;
+            background-color: #ffffff !important;
+            border: 2px solid #16a34a !important;
         }}
         body.light-mode .blacklist-container .blacklist-list {{
-            background-color: #FFFFFF !important;
+            background-color: #f0fdf4 !important;
+            border: 1px solid #bbf7d0 !important;
+        }}
+        body.light-mode .blacklist-container .playlist-list {{
+            background-color: #f0fdf4 !important;
+            border: 1px solid #bbf7d0 !important;
+        }}
+        body.light-mode .blacklist-container p {{
+            background-color: #fef3c7 !important;
+            color: #92400e !important;
+        }}
+        body.light-mode .blacklist-container h3 {{
+            color: #16a34a !important;
+        }}
+        body.light-mode .blacklist-container li {{
+            border-bottom: 1px solid #e2e8f0 !important;
+        }}
+        body.light-mode .blacklist-container strong {{
+            color: #16a34a !important;
         }}
         .top-item-card {{
             display: flex;
@@ -949,15 +1329,17 @@ def database_values():
             border: 1px solid #2a2a2a;
         }}
         body.light-mode .top-item-card {{
-            background-color: #f5f5f5;
-            border: 1px solid #ddd;
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }}
         .top-item-card:hover {{
             background-color: #2a2a2a;
             transform: translateX(5px);
         }}
         body.light-mode .top-item-card:hover {{
-            background-color: #e8e8e8;
+            background-color: #f0fdf4;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }}
         .rank-number {{
             font-size: 32px;
@@ -986,7 +1368,10 @@ def database_values():
             font-size: 14px;
         }}
         body.light-mode .item-subtitle {{
-            color: #666;
+            color: #64748b;
+        }}
+        body.light-mode .item-title {{
+            color: #1e293b;
         }}
         .item-stats {{
             display: flex;
@@ -1003,12 +1388,15 @@ def database_values():
             font-weight: bold;
             color: #1DB954;
         }}
+        body.light-mode .stat-value {{
+            color: #16a34a;
+        }}
         .stat-label {{
             font-size: 12px;
             color: #b3b3b3;
         }}
         body.light-mode .stat-label {{
-            color: #666;
+            color: #64748b;
         }}
         .user-profile {{
             position: absolute;
@@ -1023,6 +1411,24 @@ def database_values():
             height: 50px;
             border-radius: 50%;
             border: 2px solid #1DB954;
+        }}
+        body.light-mode .user-profile img {{
+            border: 2px solid #16a34a;
+        }}
+        body.light-mode .rank-number {{
+            color: #16a34a;
+        }}
+        body.light-mode button {{
+            color: #ffffff;
+        }}
+        body.light-mode a {{
+            color: #16a34a;
+        }}
+        body.light-mode a:hover {{
+            color: #15803d;
+        }}
+        body.light-mode .main-title {{
+            color: #16a34a;
         }}
         .user-profile span {{
             font-size: 18px;
@@ -1140,10 +1546,12 @@ def database_values():
             var songsToggle = document.getElementById('blacklist-toggle-songs');
             var artistsToggle = document.getElementById('blacklist-toggle-artists');
             var albumsToggle = document.getElementById('blacklist-toggle-albums');
+            var genresToggle = document.getElementById('blacklist-toggle-genres');
             
             if (songsToggle) songsToggle.checked = showBlacklistedStats;
             if (artistsToggle) artistsToggle.checked = showBlacklistedStats;
             if (albumsToggle) albumsToggle.checked = showBlacklistedStats;
+            if (genresToggle) genresToggle.checked = showBlacklistedStats;
             
             toggleBlacklistedStats();
         }}
@@ -1221,8 +1629,40 @@ def database_values():
         }}
         
         function syncSongs() {{
-            var limit = document.getElementById('syncLimit').value;
-            window.location.href = '/sync_recent?limit=' + limit;
+            // Show progress bar and disable button
+            var btn = document.getElementById('loadSongsBtn');
+            var progress = document.getElementById('syncProgress');
+            var progressBar = document.getElementById('progressBar');
+            var progressText = document.getElementById('progressText');
+            
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            btn.style.cursor = 'not-allowed';
+            progress.style.display = 'block';
+            
+            // Animate progress bar (simulated since we don't have real-time updates)
+            var width = 0;
+            var interval = setInterval(function() {{
+                if (width >= 85) {{
+                    clearInterval(interval);
+                    progressText.textContent = 'Almost done...';
+                }} else if (width >= 70) {{
+                    width += 1;
+                    progressBar.style.width = width + '%';
+                    progressText.textContent = 'Processing tracks... ' + width + '%';
+                }} else if (width >= 40) {{
+                    width += 2;
+                    progressBar.style.width = width + '%';
+                    progressText.textContent = 'Loading recent tracks... ' + width + '%';
+                }} else {{
+                    width += 5;
+                    progressBar.style.width = width + '%';
+                    progressText.textContent = 'Connecting to Spotify... ' + width + '%';
+                }}
+            }}, 400);
+            
+            // Navigate to sync route
+            window.location.href = '/sync_recent';
         }}
         
         function clearDatabase() {{
@@ -1384,8 +1824,8 @@ def database_values():
             }});
         }}
         
-        // Remove playlist from blacklist without page refresh
-        function removeFromBlacklist(event, playlistId) {{
+        // Move playlist from blacklist to normal list
+        function moveToNormalList(event, playlistId, playlistName, playlistImg) {{
             event.preventDefault();
             
             fetch('/remove_from_blacklist/' + playlistId, {{
@@ -1394,26 +1834,171 @@ def database_values():
             .then(response => response.json())
             .then(data => {{
                 if (data.success) {{
-                    // Remove the playlist from the list
-                    var li = document.querySelector('li[data-playlist-id="' + playlistId + '"]');
-                    if (li) {{
-                        li.remove();
+                    // Remove from blacklist
+                    var blacklistUl = document.getElementById('blacklisted-playlists-list');
+                    var blacklistLi = blacklistUl.querySelector('li[data-playlist-id="' + playlistId + '"]');
+                    if (blacklistLi) {{
+                        blacklistLi.remove();
                     }}
                     
-                    // If no playlists left, show the "no playlists" message
-                    var ul = document.querySelector('.blacklist-list ul');
-                    if (ul.children.length === 0) {{
+                    // If no playlists left in blacklist, show message
+                    if (blacklistUl.children.length === 0) {{
                         var li = document.createElement('li');
                         li.style.cssText = 'color: #888; font-style: italic;';
                         li.textContent = 'No playlists blacklisted yet';
-                        ul.appendChild(li);
+                        blacklistUl.appendChild(li);
                     }}
+                    
+                    // Add to normal list
+                    var normalUl = document.getElementById('normal-playlists-list');
+                    
+                    // Remove "no playlists" message if it exists
+                    var noPlaylistsMsg = normalUl.querySelector('li[style*="italic"]');
+                    if (noPlaylistsMsg) {{
+                        normalUl.removeChild(noPlaylistsMsg);
+                    }}
+                    
+                    var li = document.createElement('li');
+                    li.style.cssText = 'padding: 5px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;';
+                    li.setAttribute('data-playlist-id', playlistId);
+                    li.setAttribute('data-playlist-name', playlistName);
+                    li.setAttribute('data-playlist-img', playlistImg);
+                    
+                    var playlistIcon = '';
+                    if (playlistImg) {{
+                        playlistIcon = '<img src="' + playlistImg + '" alt="" style="width: 40px; height: 40px; margin-right: 10px; border-radius: 4px; vertical-align: middle;">';
+                    }} else {{
+                        playlistIcon = '• ';
+                    }}
+                    
+                    li.innerHTML = '<span style="display: flex; align-items: center;">' + playlistIcon + playlistName + '</span>' +
+                                   '<button onclick=\\'moveToBlacklistFromNormal(event, \"' + playlistId + '\", \"' + playlistName + '\", \"' + playlistImg + '\")\\'  style=\"padding: 4px 12px; background-color: #dc3545; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;\" title=\"Move to blacklist\">Blacklist</button>';
+                    
+                    normalUl.appendChild(li);
                 }} else {{
                     alert('Error removing from blacklist');
                 }}
             }})
             .catch(error => {{
                 alert('Error removing from blacklist');
+                console.error('Error:', error);
+            }});
+        }}
+        
+        // Move playlist from normal list to blacklist
+        function moveToBlacklistFromNormal(event, playlistId, playlistName, playlistImg) {{
+            event.preventDefault();
+            
+            fetch('/add_to_blacklist', {{
+                method: 'POST',
+                headers: {{
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                }},
+                body: 'playlist_url=' + encodeURIComponent(playlistId)
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                if (data.success) {{
+                    // Remove from normal list
+                    var normalUl = document.getElementById('normal-playlists-list');
+                    var normalLi = normalUl.querySelector('li[data-playlist-id="' + playlistId + '"]');
+                    if (normalLi) {{
+                        normalLi.remove();
+                    }}
+                    
+                    // If no playlists left in normal list, show message
+                    if (normalUl.children.length === 0) {{
+                        var li = document.createElement('li');
+                        li.style.cssText = 'color: #888; font-style: italic;';
+                        li.textContent = 'No playlists found';
+                        normalUl.appendChild(li);
+                    }}
+                    
+                    // Add to blacklist
+                    var blacklistUl = document.getElementById('blacklisted-playlists-list');
+                    
+                    // Remove "no playlists" message if it exists
+                    var noPlaylistsMsg = blacklistUl.querySelector('li[style*="italic"]');
+                    if (noPlaylistsMsg) {{
+                        blacklistUl.removeChild(noPlaylistsMsg);
+                    }}
+                    
+                    var li = document.createElement('li');
+                    li.style.cssText = 'padding: 5px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;';
+                    li.setAttribute('data-playlist-id', data.playlist.id);
+                    li.setAttribute('data-playlist-name', data.playlist.name);
+                    li.setAttribute('data-playlist-img', data.playlist.image_url || '');
+                    
+                    var playlistIcon = '';
+                    if (data.playlist.image_url) {{
+                        playlistIcon = '<img src="' + data.playlist.image_url + '" alt="" style="width: 40px; height: 40px; margin-right: 10px; border-radius: 4px; vertical-align: middle;">';
+                    }} else {{
+                        playlistIcon = '• ';
+                    }}
+                    
+                    li.innerHTML = '<span style="display: flex; align-items: center;">' + playlistIcon + data.playlist.name + '</span>' +
+                                   '<button onclick=\\'moveToNormalList(event, \"' + data.playlist.id + '\", \"' + data.playlist.name + '\", \"' + (data.playlist.image_url || '') + '\")\\'  style=\"padding: 4px 12px; background-color: #1DB954; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;\" title=\"Move to normal playlists\">Unblacklist</button>';
+                    
+                    blacklistUl.appendChild(li);
+                }} else {{
+                    alert('Error: ' + data.error);
+                }}
+            }})
+            .catch(error => {{
+                alert('Error adding to blacklist');
+                console.error('Error:', error);
+            }});
+        }}
+        
+        // Add playlist manually (for playlists not in user's account)
+        function addPlaylistManually(event) {{
+            event.preventDefault();
+            var playlistUrl = document.getElementById('playlist_url').value;
+            
+            fetch('/add_to_blacklist', {{
+                method: 'POST',
+                headers: {{
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                }},
+                body: 'playlist_url=' + encodeURIComponent(playlistUrl)
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                if (data.success) {{
+                    // Add to normal list (since manual add doesn't automatically blacklist)
+                    var normalUl = document.getElementById('normal-playlists-list');
+                    
+                    // Remove "no playlists" message if it exists
+                    var noPlaylistsMsg = normalUl.querySelector('li[style*="italic"]');
+                    if (noPlaylistsMsg) {{
+                        normalUl.removeChild(noPlaylistsMsg);
+                    }}
+                    
+                    var li = document.createElement('li');
+                    li.style.cssText = 'padding: 5px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;';
+                    li.setAttribute('data-playlist-id', data.playlist.id);
+                    li.setAttribute('data-playlist-name', data.playlist.name);
+                    li.setAttribute('data-playlist-img', data.playlist.image_url || '');
+                    
+                    var playlistIcon = '';
+                    if (data.playlist.image_url) {{
+                        playlistIcon = '<img src="' + data.playlist.image_url + '" alt="" style="width: 40px; height: 40px; margin-right: 10px; border-radius: 4px; vertical-align: middle;">';
+                    }} else {{
+                        playlistIcon = '• ';
+                    }}
+                    
+                    li.innerHTML = '<span style="display: flex; align-items: center;">' + playlistIcon + data.playlist.name + '</span>' +
+                                   '<button onclick=\\'moveToBlacklistFromNormal(event, \"' + data.playlist.id + '\", \"' + data.playlist.name + '\", \"' + (data.playlist.image_url || '') + '\")\\'  style=\"padding: 4px 12px; background-color: #dc3545; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;\" title=\"Move to blacklist\">Blacklist</button>';
+                    
+                    normalUl.appendChild(li);
+                    document.getElementById('playlist_url').value = '';
+                    alert('Playlist added! Click the Blacklist button to blacklist it.');
+                }} else {{
+                    alert('Error: ' + data.error);
+                }}
+            }})
+            .catch(error => {{
+                alert('Error adding playlist');
                 console.error('Error:', error);
             }});
         }}
@@ -1437,21 +2022,23 @@ def database_values():
     <h1 class="main-title">Welcome to Kungungalacorgus.stats!</h1>
     
     <div class="blacklist-container" style="margin: 20px 0; padding: 15px; border: 2px solid #1DB954; border-radius: 8px; background-color: #1e1e1e;">
-        <h3 style="margin-top: 0;">🚫 Blacklist</h3>
+        <h3 style="margin-top: 0;">🚫 Playlist Management</h3>
         <p style="color: #ffa500; font-size: 14px; margin-bottom: 15px; padding: 10px; background-color: #2a2a2a; border-radius: 4px;">
             ⚠️ <strong>Important:</strong> Blacklisted data will only be collected for songs played <em>after</em> adding the playlist to the blacklist. 
             This does not work retroactively unless you clear the database and reload all songs.
         </p>
-        <form onsubmit="addToBlacklist(event)" style="margin-bottom: 15px;">
-            <label for="playlist_url" style="font-weight: bold;">Playlist URL or ID:</label>
+        <form onsubmit="addPlaylistManually(event)" style="margin-bottom: 15px;">
+            <label for="playlist_url" style="font-weight: bold;">Add Playlist URL or ID:</label>
             <input type="text" id="playlist_url" name="playlist_url" placeholder="https://open.spotify.com/playlist/..." style="width: 400px; padding: 8px; margin: 0 10px; font-size: 14px;">
-            <button type="submit" style="padding: 8px 16px; background-color: #dc3545; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px;">
-                Blacklist
+            <button type="submit" style="padding: 8px 16px; background-color: #1DB954; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px;">
+                Add Playlist
             </button>
         </form>
-        <div class="blacklist-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #1DB954; padding: 10px; background-color: #2a2a2a; border-radius: 4px;">
-            <strong>Blacklisted Playlists:</strong>
-            <ul style="list-style-type: none; padding-left: 0; margin: 10px 0 0 0;">
+        
+        <!-- Blacklisted Playlists Box -->
+        <div class="blacklist-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #dc3545; padding: 10px; background-color: #2a2a2a; border-radius: 4px; margin-bottom: 15px;">
+            <strong style="color: #dc3545;">🚫 Blacklisted Playlists:</strong>
+            <ul id="blacklisted-playlists-list" style="list-style-type: none; padding-left: 0; margin: 10px 0 0 0;">
     """
     
     if blacklist:
@@ -1463,12 +2050,49 @@ def database_values():
             else:
                 playlist_icon = "• "
             
-            html += f"""<li style='padding: 5px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;' data-playlist-id='{playlist['id']}'>
+            # Escape single quotes in playlist name for JavaScript
+            safe_name = playlist['name'].replace("'", "\\'").replace('"', '&quot;')
+            safe_img = playlist.get('image_url', '').replace("'", "\\'") if playlist.get('image_url') else ''
+            
+            html += f"""<li style='padding: 5px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;' data-playlist-id='{playlist['id']}' data-playlist-name='{safe_name}' data-playlist-img='{safe_img}'>
                 <span style='display: flex; align-items: center;'>{playlist_icon}{playlist['name']}</span>
-                <a href='#' onclick='removeFromBlacklist(event, "{playlist["id"]}")' style='color: #dc3545; text-decoration: none; font-weight: bold; font-size: 18px; cursor: pointer; padding: 0 10px;' title='Remove from blacklist'>✕</a>
+                <button onclick='moveToNormalList(event, "{playlist["id"]}", "{safe_name}", "{safe_img}")' style='padding: 4px 12px; background-color: #1DB954; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;' title='Move to normal playlists'>Unblacklist</button>
             </li>"""
     else:
         html += "<li style='color: #888; font-style: italic;'>No playlists blacklisted yet</li>"
+    
+    html += """
+            </ul>
+        </div>
+        
+        <!-- Normal Playlists Box -->
+        <div class="playlist-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #1DB954; padding: 10px; background-color: #2a2a2a; border-radius: 4px;">
+            <strong style="color: #1DB954;">📋 Your Playlists:</strong>
+            <ul id="normal-playlists-list" style="list-style-type: none; padding-left: 0; margin: 10px 0 0 0;">
+    """
+    
+    # Get blacklist IDs for filtering
+    blacklist_ids = {p['id'] for p in blacklist}
+    normal_playlists = [p for p in all_playlists if p['id'] not in blacklist_ids]
+    
+    if normal_playlists:
+        for playlist in normal_playlists:
+            playlist_icon = ""
+            if playlist.get('image_url'):
+                playlist_icon = f'<img src="{playlist["image_url"]}" alt="" style="width: 40px; height: 40px; margin-right: 10px; border-radius: 4px; vertical-align: middle;">'
+            else:
+                playlist_icon = "• "
+            
+            # Escape single quotes in playlist name for JavaScript
+            safe_name = playlist['name'].replace("'", "\\'").replace('"', '&quot;')
+            safe_img = playlist.get('image_url', '').replace("'", "\\'") if playlist.get('image_url') else ''
+            
+            html += f"""<li style='padding: 5px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;' data-playlist-id='{playlist['id']}' data-playlist-name='{safe_name}' data-playlist-img='{safe_img}'>
+                <span style='display: flex; align-items: center;'>{playlist_icon}{playlist['name']}</span>
+                <button onclick='moveToBlacklistFromNormal(event, "{playlist["id"]}", "{safe_name}", "{safe_img}")' style='padding: 4px 12px; background-color: #dc3545; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;' title='Move to blacklist'>Blacklist</button>
+            </li>"""
+    else:
+        html += "<li style='color: #888; font-style: italic;'>No playlists found</li>"
     
     html += """
             </ul>
@@ -1513,12 +2137,16 @@ def database_values():
                     <span class="time-format-label">d/h/m</span>
                 </div>
                 <div>
-                    <label for="syncLimit" style="font-weight: bold; margin-right: 10px;">Load songs (1-50):</label>
-                    <input type="number" id="syncLimit" min="1" max="50" value="10" style="width: 70px; padding: 8px; font-size: 14px;">
-                    <button onclick="syncSongs()" style="padding: 8px 16px; background-color: #1DB954; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px; margin-left: 10px;">
-                        📥 Load
+                    <label style="font-weight: bold; margin-right: 10px;">Load Recent History:</label>
+                    <button id="loadSongsBtn" onclick="syncSongs()" style="padding: 8px 16px; background-color: #1DB954; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px;">
+                        📥 Load Songs
                     </button>
-                    <p style="font-size: 12px; color: #888; margin: 5px 0 0 0; font-style: italic;">Can be used multiple times to load more history</p>
+                    <div id="syncProgress" style="display: none; margin-top: 10px; width: 300px;">
+                        <div style="background-color: #ddd; border-radius: 10px; height: 20px; overflow: hidden;">
+                            <div id="progressBar" style="background-color: #1DB954; height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+                        </div>
+                        <p id="progressText" style="font-size: 12px; color: #888; margin: 5px 0 0 0; text-align: center;">Loading...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1660,29 +2288,6 @@ def database_values():
                 </div>
             </div>
         </div>
-        
-        <h2>Your Playlists</h2>
-        <table border="1" style="border-collapse: collapse; width: 100%;">
-            <tr>
-                <th style="padding: 10px;">Playlist Name</th>
-            </tr>
-    """
-    
-    for playlist in all_playlists:
-        playlist_display = ""
-        if playlist.get('image_url'):
-            playlist_display = f'<img src="{playlist["image_url"]}" alt="{playlist["name"]}" style="width: 50px; height: 50px; margin-right: 10px; vertical-align: middle; border-radius: 4px;"> {playlist["name"]}'
-        else:
-            playlist_display = playlist['name']
-        
-        html += f"""
-            <tr>
-                <td style="padding: 10px;">{playlist_display}</td>
-            </tr>
-        """
-    
-    html += """
-        </table>
     </div>
     
     <!-- Top Songs Tab -->
@@ -1915,5 +2520,80 @@ def refresh_token():
     
     return redirect('/menu')
 
-if __name__ == '__main__':
+def kill_existing_flask():
+    """Kill any existing Flask processes running on port 5000"""
+    import socket
+    
+    # Try to bind to port 5000 to check if it's in use
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.bind(('127.0.0.1', 5000))
+        sock.close()
+        # Port is free, no need to kill anything
+        return
+    except OSError:
+        # Port is in use, find and kill the process
+        sock.close()
+        pass
+    
+    current_pid = os.getpid()
+    killed_pids = []
+    
+    try:
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'create_time']):
+            try:
+                # Check if it's a Python process running main.py with --flask-only flag
+                if proc.info['name'] and 'python' in proc.info['name'].lower():
+                    cmdline = proc.info['cmdline']
+                    cmdline_str = ' '.join(cmdline) if cmdline else ''
+                    # Only kill Flask processes with --flask-only flag, not the menu
+                    if cmdline and 'main.py' in cmdline_str and '--flask-only' in cmdline_str:
+                        # Don't kill ourselves (check PID)
+                        if proc.info['pid'] != current_pid:
+                            print(f"Terminating existing Flask process (PID: {proc.info['pid']})")
+                            killed_pids.append(proc.info['pid'])
+                            proc.terminate()
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+    except Exception as e:
+        print(f"Warning: Could not check for existing processes: {e}")
+    
+    if killed_pids:
+        time.sleep(3)  # Wait for processes to terminate and port to be released
+        print(f"Terminated {len(killed_pids)} existing Flask process(es).")
+
+def start_flask_server():
+    """Start the Flask server - called by menu or directly"""
+    # Kill any existing Flask instances before starting
+    kill_existing_flask()
+    
+    # Start ngrok when Flask starts
+    start_ngrok()
+    
+    print("="*60)
+    print("Flask Server Starting")
+    print("="*60)
+    print("\nThe application is now running!")
+    print("\n  Local URL:  http://localhost:5000")
+    print("  Ngrok URL:  https://easily-crankier-coleman.ngrok-free.dev")
+    print("\n  Background sync: Every 2 minutes")
+    print("\n" + "="*60)
+    print("Flask server logs will appear below:")
+    print("="*60 + "\n")
+    
     app.run(host='0.0.0.0', debug=False, use_reloader=False)
+
+if __name__ == '__main__':
+    # Check if we're being run directly to start Flask (from menu)
+    # or if we should show the menu
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == '--flask-only':
+        start_flask_server()
+    else:
+        # Start the menu system
+        try:
+            import menu
+            menu.main()
+        except KeyboardInterrupt:
+            print("\n\n✓ Goodbye!\n")
+            sys.exit(0)
